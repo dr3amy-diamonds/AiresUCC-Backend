@@ -1,0 +1,185 @@
+# ============================================================================
+# GITIGNORE - Sistema de Gestión de Aires Acondicionados UCC
+# ============================================================================
+# Este archivo especifica qué archivos y carpetas NO deben subirse al
+# repositorio remoto (GitHub, GitLab, etc.)
+# ============================================================================
+
+# ============================================================================
+# 🐍 PYTHON - COMPILADO Y CACHÉ
+# ============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# ============================================================================
+# 🔑 VARIABLES DE ENTORNO Y SECRETOS
+# ============================================================================
+# NUNCA commitear archivos .env con credenciales
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.production.local
+
+# ============================================================================
+# 📦 ENTORNOS VIRTUALES
+# ============================================================================
+# No versionar los entornos virtuales (se regeneran con pip install -r requirements.txt)
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# ============================================================================
+# 💻 IDEs Y EDITORES
+# ============================================================================
+# JetBrains IDEs (PyCharm, WebStorm, etc.)
+.idea/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+.#*
+
+# ============================================================================
+# 📊 PRUEBAS Y COBERTURA
+# ============================================================================
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.hypothesis/
+
+# ============================================================================
+# 🗂️ BASES DE DATOS LOCALES
+# ============================================================================
+# Bases de datos SQLite (si se usan en desarrollo)
+*.db
+*.sqlite
+*.sqlite3
+
+# Archivos PostgreSQL en desarrollo
+postgres_data/
+pg_data/
+
+# ============================================================================
+# 📝 LOGS Y ARCHIVOS TEMPORALES
+# ============================================================================
+*.log
+logs/
+*.pot
+*.mo
+*.tmp
+
+# ============================================================================
+# 📂 SISTEMA OPERATIVO
+# ============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+desktop.ini
+*.lnk
+
+# Linux
+.Trash-*
+.directory
+
+# ============================================================================
+# 🚀 ARCHIVOS DE COMPILACIÓN Y BUILD
+# ============================================================================
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+
+# ============================================================================
+# 🔧 OTROS ARCHIVOS TEMPORALES
+# ============================================================================
+*.bak
+*.backup
+*.swp
+.~*
+$RECYCLE.BIN/
+
+# Archivos de configuración local (solo para desarrollo)
+local_config.py
+config.local.py
+
+# ============================================================================
+# 📄 NOTAS Y DOCUMENTACIÓN TEMPORAL
+# ============================================================================
+# Archivos TODO personales
+TODO_LOCAL.md
+NOTES_LOCAL.md
+
+# ============================================================================
+# 🌐 DUMPS DE BASES DE DATOS LOCALES
+# ============================================================================
+# Nota: Los archivos SQL en /databse/ SÍ deben subirse (están en el repo)
+# Solo ignorar dumps locales
+backup.sql
+dump_*.sql
+export_*.sql
+
+# ============================================================================
+# 🔐 ARCHIVOS DE CERTIFICADOS Y CLAVES
+# ============================================================================
+*.pem
+*.key
+*.crt
+*.cert
+*.pfx
+
+# ============================================================================
+# 🎯 ESPECIFICO DEL PROYECTO
+# ============================================================================
+# Variables de entorno del backend
+backend/.env
+
+# Archivos compilados de Python en el backend
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
+
+# Cache de Alembic
+backend/alembic/__pycache__/
+
+# Reportes generados localmente
+reportes_generados/
+*.csv.local
+

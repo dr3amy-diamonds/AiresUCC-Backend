@@ -1,0 +1,11 @@
+__pycache__/
+.venv/
+.env
+*.py[cod]
+
+# Alembic
+alembic/
+
+# Pruebas
+.pytest_cache/
+.coverage
