@@ -6,6 +6,14 @@
 # ============================================================================
 
 # ============================================================================
+# 🔒 GIT Y CONTROL DE VERSIONES
+# ============================================================================
+# Ignorar el directorio .git (aunque Git lo maneja por defecto)
+.git/
+.gitmodules
+.gitattributes
+
+# ============================================================================
 # 🐍 PYTHON - COMPILADO Y CACHÉ
 # ============================================================================
 __pycache__/
@@ -168,8 +176,13 @@ export_*.sql
 # ============================================================================
 # 🎯 ESPECIFICO DEL PROYECTO
 # ============================================================================
-# Variables de entorno del backend
+# ⚠️ CRÍTICO: Variables de entorno del backend (contiene credenciales sensibles)
+# NUNCA debes commitear estos archivos con datos reales
 backend/.env
+backend/.env.local
+backend/.env.*.local
+backend/.env.development.local
+backend/.env.production.local
 
 # Archivos compilados de Python en el backend
 backend/__pycache__/
@@ -178,8 +191,37 @@ backend/**/*.pyc
 
 # Cache de Alembic
 backend/alembic/__pycache__/
+alembic/__pycache__/
+alembic/versions/__pycache__/
 
 # Reportes generados localmente
 reportes_generados/
 *.csv.local
+local_reports/
+
+# ============================================================================
+# 🔒 ARCHIVOS DE SEGURIDAD ADICIONALES
+# ============================================================================
+# Asegurar que ningún archivo .env sea commiteado accidentalmente
+.env*
+!.env.example
+
+# Archivos temporales de IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Archivos de caché específicos del proyecto
+*.pyc
+__pycache__/
+*.egg-info/
+
+# Archivos temporales generados por herramientas
+.coverage
+.pytest_cache/
+htmlcov/
+dist/
+build/
 
