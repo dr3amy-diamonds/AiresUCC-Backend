@@ -26,4 +26,5 @@ class Marca(Base):
     # Restricciones
     __table_args__ = (
         UniqueConstraint('nombre', name='uq_marca_nombre'),
+        {"schema": "gestion_aires_ucc"}
     )

@@ -6,16 +6,12 @@ Implementa funciones para hashear contraseñas y gestionar tokens JWT.
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 import os
-from passlib.context import CryptContext
+import bcrypt
 from jose import JWTError, jwt
 from dotenv import load_dotenv
 
 # Cargar variables de entorno
 load_dotenv()
-
-# Configuración de hashing de contraseñas
-# Usa bcrypt con esquema automático (recomendado para SQLAlchemy 2.0+)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Configuración de JWT
 SECRET_KEY: str = os.getenv("SECRET_KEY", "tu-clave-secreta-muy-segura-cambiar-en-produccion")
@@ -25,24 +21,27 @@ ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 
 
 def hashear_contrasena(contrasena: str) -> str:
     """
-    Hashea una contraseña en texto plano usando bcrypt.
+    Hashea una contraseña en texto plano usando bcrypt directamente.
 
     Args:
         contrasena (str): Contraseña en texto plano.
 
     Returns:
-        str: Contraseña hasheada.
+        str: Contraseña hasheada como string.
 
     Ejemplo:
         >>> hashed = hashear_contrasena("mi_contraseña_123")
         >>> # El hash será diferente cada vez (bcrypt incluye salt)
     """
-    return pwd_context.hash(contrasena)
+    # Convertir a bytes, hashear, y devolver como string
+    salt = bcrypt.gensalt(rounds=12)
+    hashed = bcrypt.hashpw(contrasena.encode('utf-8'), salt)
+    return hashed.decode('utf-8')
 
 
 def verificar_contrasena(contrasena_plana: str, contrasena_hasheada: str) -> bool:
     """
-    Verifica que una contraseña en texto plano coincida con su hash.
+    Verifica que una contraseña en texto plano coincida con su hash bcrypt.
 
     Args:
         contrasena_plana (str): Contraseña en texto plano.
@@ -55,7 +54,14 @@ def verificar_contrasena(contrasena_plana: str, contrasena_hasheada: str) -> boo
         >>> es_correcta = verificar_contrasena("mi_contraseña_123", hashed)
         >>> print(es_correcta)  # True
     """
-    return pwd_context.verify(contrasena_plana, contrasena_hasheada)
+    try:
+        # Convertir hash a bytes si es string
+        if isinstance(contrasena_hasheada, str):
+            contrasena_hasheada = contrasena_hasheada.encode('utf-8')
+
+        return bcrypt.checkpw(contrasena_plana.encode('utf-8'), contrasena_hasheada)
+    except Exception:
+        return False
 
 
 def crear_token_acceso(

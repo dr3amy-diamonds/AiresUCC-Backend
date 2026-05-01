@@ -19,10 +19,11 @@ from enum import Enum
 
 class TipoRolSchema(str, Enum):
     """Roles disponibles en el sistema (debe coincidir con TipoRol del modelo)."""
-    ADMINISTRADOR = "Administrador"
-    TECNICO = "Técnico"
+    TECNICO_INTERNO = "Tecnico interno"
     SUPERVISOR = "Supervisor"
+    ADMINISTRADOR = "Administrador"
     CONTRATISTA = "Contratista"
+    SOLO_LECTURA = "Solo lectura"
 
 
 # ============================================================================

@@ -4,13 +4,32 @@ Centraliza las importaciones de los modelos para facilitar su uso en toda la apl
 """
 
 from app.models.marca import Marca
-from app.models.equipo import Equipo, EstadoEquipo
+from app.models.equipo import Equipo
 from app.models.usuario import Usuario, TipoRol
+from app.models.espacio import Espacio
+from app.models.bloque import Bloque
+from app.models.tipo_espacio import TipoEspacio
+from app.models.tipo_equipo import TipoEquipo
+from app.models.tipo_mantenimiento import TipoMantenimiento
+from app.models.componente import TipoComponente
+from app.models.mantenimiento import Mantenimiento
+from app.models.componente_usado import ComponenteUsado
+from app.models.programacion import Programacion
+from app.models.auditoria import Auditoria
 
 __all__ = [
     "Marca",
     "Equipo",
-    "EstadoEquipo",
     "Usuario",
     "TipoRol",
+    "Espacio",
+    "Bloque",
+    "TipoEspacio",
+    "TipoEquipo",
+    "TipoMantenimiento",
+    "TipoComponente",
+    "Mantenimiento",
+    "ComponenteUsado",
+    "Programacion",
+    "Auditoria",
 ]
