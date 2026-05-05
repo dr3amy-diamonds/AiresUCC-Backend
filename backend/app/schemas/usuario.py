@@ -48,7 +48,7 @@ class UsuarioBase(BaseModel):
         description="Correo institucional único. Validado con EmailStr para evitar inyecciones de datos inválidos"
     )
     tipo_rol: TipoRolSchema = Field(
-        default=TipoRolSchema.TECNICO,
+        default=TipoRolSchema.TECNICO_INTERNO,
         description="Rol asignado: Administrador, Técnico, Supervisor o Contratista"
     )
     activo: bool = Field(

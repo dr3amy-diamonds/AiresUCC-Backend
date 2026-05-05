@@ -1,0 +1,424 @@
+"""
+Capa de Servicios para la Entidad Mantenimiento.
+
+Este módulo encapsula toda la lógica de negocio relacionada con mantenimientos:
+- Creación de registros con validación de FK
+- Listado paginado con filtros
+- ** CRÍTICO: Al crear, cambia estado del equipo a "Operativo" **
+- Actualización con auditoría
+- Búsquedas por equipo, técnico, fecha
+
+Arquitectura:
+- Lógica de negocio separada de rutas FastAPI
+- Validación de integridad referencial
+- Excepciones lanzadas para que endpoints manejen
+- Timestamps de BD (no cliente)
+
+NOTA MUY IMPORTANTE:
+El campo 'registrado_por' debe ser inyectado desde JWT del usuario autenticado.
+"""
+
+from typing import Optional, List, Tuple
+from datetime import datetime, date, timedelta
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func, desc
+
+from app.models.mantenimiento import Mantenimiento
+from app.models.equipo import Equipo
+from app.models.usuario import Usuario
+from app.schemas.mantenimiento import MantenimientoCreate, MantenimientoUpdate
+
+
+# ============================================================================
+# FUNCIONES DE LECTURA (READ)
+# ============================================================================
+
+def obtener_mantenimiento_por_id(db: Session, mantenimiento_id: int) -> Optional[Mantenimiento]:
+    """
+    Obtiene un registro de mantenimiento por su ID.
+
+    Args:
+        db (Session): Sesión de SQLAlchemy
+        mantenimiento_id (int): ID del mantenimiento a buscar
+
+    Returns:
+        Optional[Mantenimiento]: Objeto encontrado o None
+
+    Ejemplo:
+        >>> mant = obtener_mantenimiento_por_id(db, 42)
+        >>> if mant:
+        ...     print(f"Mantenimiento del equipo {mant.equipo.codigo_activo}")
+    """
+    return db.query(Mantenimiento).filter(
+        Mantenimiento.id == mantenimiento_id
+    ).first()
+
+
+def listar_mantenimientos(
+    db: Session,
+    skip: int = 0,
+    limit: int = 10,
+    equipo_id: Optional[int] = None,
+    encargado_id: Optional[int] = None,
+    fecha_desde: Optional[date] = None,
+    fecha_hasta: Optional[date] = None,
+) -> Tuple[List[Mantenimiento], int]:
+    """
+    Obtiene lista paginada de mantenimientos con filtros opcionales.
+
+    Args:
+        db (Session): Sesión de SQLAlchemy
+        skip (int): Offset para paginación
+        limit (int): Límite de registros (máximo 100)
+        equipo_id (Optional[int]): Filtrar por equipo específico
+        encargado_id (Optional[int]): Filtrar por técnico responsable
+        fecha_desde (Optional[date]): Filtrar mantenimientos a partir de fecha
+        fecha_hasta (Optional[date]): Filtrar mantenimientos hasta fecha
+
+    Returns:
+        Tuple[List[Mantenimiento], int]: (lista de mantenimientos, total)
+
+    Ejemplo:
+        >>> mantenimientos, total = listar_mantenimientos(
+        ...     db,
+        ...     equipo_id=5,
+        ...     fecha_desde=date(2026, 1, 1),
+        ...     limit=20
+        ... )
+        >>> print(f"Mostrando {len(mantenimientos)} de {total} mantenimientos")
+    """
+    # Construir query base
+    query = db.query(Mantenimiento)
+
+    # Aplicar filtros
+    if equipo_id is not None:
+        query = query.filter(Mantenimiento.equipo_id == equipo_id)
+
+    if encargado_id is not None:
+        query = query.filter(Mantenimiento.encargado_id == encargado_id)
+
+    if fecha_desde is not None:
+        query = query.filter(Mantenimiento.fecha_mantenimiento >= fecha_desde)
+
+    if fecha_hasta is not None:
+        query = query.filter(Mantenimiento.fecha_mantenimiento <= fecha_hasta)
+
+    # Contar total antes de paginar
+    total = query.count()
+
+    # Paginar y ordenar (más recientes primero)
+    mantenimientos = (
+        query
+        .order_by(desc(Mantenimiento.fecha_mantenimiento))
+        .offset(skip)
+        .limit(min(limit, 100))  # Cap limit a 100
+        .all()
+    )
+
+    return mantenimientos, total
+
+
+def obtener_historial_equipo(
+    db: Session,
+    equipo_id: int,
+    limit: int = 10
+) -> List[Mantenimiento]:
+    """
+    Obtiene el historial de mantenimientos de un equipo específico.
+
+    Useful para auditoría y visualizar qué se ha hecho a un aire.
+
+    Args:
+        db (Session): Sesión de SQLAlchemy
+        equipo_id (int): ID del equipo
+        limit (int): Máximo de registros a retornar
+
+    Returns:
+        List[Mantenimiento]: Historial ordenado por fecha descendente
+
+    Ejemplo:
+        >>> historial = obtener_historial_equipo(db, equipo_id=5, limit=20)
+        >>> for mant in historial:
+        ...     print(f"{mant.fecha_mantenimiento}: {mant.detalle_mantenimiento}")
+    """
+    return (
+        db.query(Mantenimiento)
+        .filter(Mantenimiento.equipo_id == equipo_id)
+        .order_by(desc(Mantenimiento.fecha_mantenimiento))
+        .limit(limit)
+        .all()
+    )
+
+
+def contar_mantenimientos_por_tipo(
+    db: Session,
+    tipo_mantenimiento_id: int,
+    fecha_desde: Optional[date] = None,
+    fecha_hasta: Optional[date] = None
+) -> int:
+    """
+    Cuenta mantenimientos de un tipo específico en rango de fechas.
+
+    Útil para estadísticas (cuántos preventivos vs correctivos).
+
+    Args:
+        db (Session): Sesión de SQLAlchemy
+        tipo_mantenimiento_id (int): ID del tipo de mantenimiento
+        fecha_desde (Optional[date]): Fecha inicio (default: 30 días atrás)
+        fecha_hasta (Optional[date]): Fecha fin (default: hoy)
+
+    Returns:
+        int: Cantidad de mantenimientos
+    """
+    # Default: últimos 30 días
+    if fecha_desde is None:
+        fecha_desde = datetime.now().date() - timedelta(days=30)
+    if fecha_hasta is None:
+        fecha_hasta = datetime.now().date()
+
+    return (
+        db.query(func.count(Mantenimiento.id))
+        .filter(Mantenimiento.tipo_mantenimiento_id == tipo_mantenimiento_id)
+        .filter(Mantenimiento.fecha_mantenimiento.between(fecha_desde, fecha_hasta))
+        .scalar() or 0
+    )
+
+
+# ============================================================================
+# FUNCIONES DE CREACIÓN (CREATE) - CRÍTICA PARA LÓGICA DE NEGOCIO
+# ============================================================================
+
+def crear_mantenimiento(
+    db: Session,
+    mantenimiento_in: MantenimientoCreate
+) -> Mantenimiento:
+    """
+    Crea un nuevo registro de mantenimiento en la BD.
+
+    ** CRÍTICO: LÓGICA DE NEGOCIO PRINCIPAL **
+
+    Flujo Completo:
+    1. Validar que equipo existe
+    2. Crear registro de mantenimiento
+    3. Cambiar estado del equipo a "Operativo" (fin de reparación)
+    4. Persistir cambios atómicamente
+
+    Args:
+        db (Session): Sesión de SQLAlchemy con transacción activa
+        mantenimiento_in (MantenimientoCreate): Datos validados de Pydantic
+
+    Returns:
+        Mantenimiento: Registro creado con ID y timestamps
+
+    Raises:
+        ValueError: Si equipo_id no existe
+        IntegrityError: Si hay error de integridad en BD
+
+    Ejemplo:
+        >>> from app.schemas.mantenimiento import MantenimientoCreate
+        >>> from datetime import date
+        >>> mant_in = MantenimientoCreate(
+        ...     equipo_id=5,
+        ...     encargado_id=3,
+        ...     tipo_mantenimiento_id=1,
+        ...     registrado_por=3,
+        ...     detalle_mantenimiento="Limpieza de filtros y recarga de refrigerante",
+        ...     fecha_mantenimiento=date.today()
+        ... )
+        >>> nuevo_mant = crear_mantenimiento(db, mant_in)
+        >>> print(f"Mantenimiento creado: ID {nuevo_mant.id}")
+    """
+    try:
+        # 1. VALIDAR EXISTENCIA DEL EQUIPO
+        equipo = db.query(Equipo).filter(Equipo.id == mantenimiento_in.equipo_id).first()
+        if not equipo:
+            raise ValueError(f"Equipo con ID {mantenimiento_in.equipo_id} no existe")
+
+        # 2. CREAR REGISTRO DE MANTENIMIENTO
+        datos = mantenimiento_in.model_dump()
+        nuevo_mantenimiento = Mantenimiento(**datos)
+        db.add(nuevo_mantenimiento)
+
+        # 3. ** CAMBIAR ESTADO DEL EQUIPO A "OPERATIVO" **
+        # NOTA: Esta es la lógica crítica de negocio
+        # Si estaba "En reparación" o "Inactivo", pasa a "Operativo"
+        # Registra en auditoría que fue mantenido
+        equipo.estado = "Operativo"
+        equipo.updated_at = datetime.now()
+
+        # 4. PERSISTIR CAMBIOS DE MANERA ATÓMICA
+        db.commit()
+        db.refresh(nuevo_mantenimiento)
+
+        return nuevo_mantenimiento
+
+    except IntegrityError as e:
+        db.rollback()
+        raise IntegrityError(
+            statement="Error al crear mantenimiento",
+            params={"equipo_id": mantenimiento_in.equipo_id},
+            orig=e.orig
+        ) from e
+    except Exception as e:
+        db.rollback()
+        raise
+
+
+# ============================================================================
+# FUNCIONES DE ACTUALIZACIÓN (UPDATE)
+# ============================================================================
+
+def actualizar_mantenimiento(
+    db: Session,
+    mantenimiento: Mantenimiento,
+    update_in: MantenimientoUpdate
+) -> Mantenimiento:
+    """
+    Actualiza un registro de mantenimiento existente.
+
+    IMPORTANTE:
+    - NO se puede cambiar equipo_id (auditoría)
+    - NO se puede cambiar fecha (auditoría)
+    - Solo se actualiza: detalle_mantenimiento
+
+    Args:
+        db (Session): Sesión de SQLAlchemy
+        mantenimiento (Mantenimiento): Objeto a actualizar
+        update_in (MantenimientoUpdate): Datos a actualizar
+
+    Returns:
+        Mantenimiento: Registro actualizado
+
+    Raises:
+        IntegrityError: Si hay error de integridad
+    """
+    try:
+        datos = update_in.model_dump(exclude_unset=True)
+
+        for campo, valor in datos.items():
+            if valor is not None:
+                setattr(mantenimiento, campo, valor)
+
+        db.commit()
+        db.refresh(mantenimiento)
+
+        return mantenimiento
+
+    except IntegrityError as e:
+        db.rollback()
+        raise IntegrityError(
+            statement="Error al actualizar mantenimiento",
+            params={"mantenimiento_id": mantenimiento.id},
+            orig=e.orig
+        ) from e
+
+
+# ============================================================================
+# FUNCIONES DE ELIMINACIÓN (DELETE)
+# ============================================================================
+
+def eliminar_mantenimiento(db: Session, mantenimiento_id: int) -> bool:
+    """
+    Elimina un registro de mantenimiento (CUIDADO: auditoría).
+
+    NOTA: Solo debe llamarse en casos especiales (datos duplicados).
+    Generalmente debe mantenerse para auditoría histórica.
+
+    Args:
+        db (Session): Sesión de SQLAlchemy
+        mantenimiento_id (int): ID del mantenimiento a eliminar
+
+    Returns:
+        bool: True si se eliminó, False si no existía
+    """
+    mantenimiento = obtener_mantenimiento_por_id(db, mantenimiento_id)
+
+    if not mantenimiento:
+        return False
+
+    try:
+        db.delete(mantenimiento)
+        db.commit()
+        return True
+    except IntegrityError as e:
+        db.rollback()
+        # Si hay FK dependientes, no se puede eliminar
+        raise IntegrityError(
+            statement="No se puede eliminar mantenimiento con dependencias",
+            params={"mantenimiento_id": mantenimiento_id},
+            orig=e.orig
+        ) from e
+
+
+# ============================================================================
+# FUNCIONES ANALÍTICAS
+# ============================================================================
+
+def obtener_estadisticas_mantenimiento(
+    db: Session,
+    fecha_desde: Optional[date] = None,
+    fecha_hasta: Optional[date] = None
+) -> dict:
+    """
+    Calcula estadísticas globales de mantenimiento.
+
+    Útil para dashboards y reportes ejecutivos.
+
+    Args:
+        db (Session): Sesión de SQLAlchemy
+        fecha_desde (Optional[date]): Fecha inicio (default: 30 días atrás)
+        fecha_hasta (Optional[date]): Fecha fin (default: hoy)
+
+    Returns:
+        dict: Diccionario con estadísticas:
+            - total: Total de mantenimientos
+            - por_equipo: Diccionario {equipo_id: count}
+            - por_tecnico: Diccionario {tecnico_id: count}
+            - promedio_por_dia: float
+    """
+    if fecha_desde is None:
+        fecha_desde = datetime.now().date() - timedelta(days=30)
+    if fecha_hasta is None:
+        fecha_hasta = datetime.now().date()
+
+    # Total de mantenimientos
+    total = (
+        db.query(func.count(Mantenimiento.id))
+        .filter(Mantenimiento.fecha_mantenimiento.between(fecha_desde, fecha_hasta))
+        .scalar() or 0
+    )
+
+    # Por equipo
+    por_equipo = {}
+    resultados_equipo = (
+        db.query(Mantenimiento.equipo_id, func.count(Mantenimiento.id))
+        .filter(Mantenimiento.fecha_mantenimiento.between(fecha_desde, fecha_hasta))
+        .group_by(Mantenimiento.equipo_id)
+        .all()
+    )
+    por_equipo = {equipo_id: count for equipo_id, count in resultados_equipo}
+
+    # Por técnico
+    por_tecnico = {}
+    resultados_tecnico = (
+        db.query(Mantenimiento.encargado_id, func.count(Mantenimiento.id))
+        .filter(Mantenimiento.fecha_mantenimiento.between(fecha_desde, fecha_hasta))
+        .group_by(Mantenimiento.encargado_id)
+        .all()
+    )
+    por_tecnico = {tecnico_id: count for tecnico_id, count in resultados_tecnico}
+
+    # Promedio por día
+    dias = (fecha_hasta - fecha_desde).days + 1
+    promedio_por_dia = round(total / dias, 2) if dias > 0 else 0
+
+    return {
+        "total": total,
+        "por_equipo": por_equipo,
+        "por_tecnico": por_tecnico,
+        "promedio_por_dia": promedio_por_dia,
+        "fecha_desde": fecha_desde,
+        "fecha_hasta": fecha_hasta,
+    }
+

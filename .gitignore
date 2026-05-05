@@ -1,227 +1,329 @@
-# ============================================================================
-# GITIGNORE - Sistema de Gestión de Aires Acondicionados UCC
-# ============================================================================
+# ==========================================
+# GITIGNORE - AiresFlow Backend API
+# Proyecto: Sistema de Gestión de Climatización UCC
+# ==========================================
 # Este archivo especifica qué archivos y carpetas NO deben subirse al
 # repositorio remoto (GitHub, GitLab, etc.)
-# ============================================================================
+# ==========================================
 
-# ============================================================================
-# 🔒 GIT Y CONTROL DE VERSIONES
-# ============================================================================
-# Ignorar el directorio .git (aunque Git lo maneja por defecto)
-.git/
-.gitmodules
-.gitattributes
+# ==========================================
+# 🔐 ARCHIVOS SENSIBLES (NUNCA SUBIR)
+# ==========================================
 
-# ============================================================================
-# 🐍 PYTHON - COMPILADO Y CACHÉ
-# ============================================================================
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-*.egg-info/
-dist/
-build/
-*.egg
-.eggs/
-
-# ============================================================================
-# 🔑 VARIABLES DE ENTORNO Y SECRETOS
-# ============================================================================
-# NUNCA commitear archivos .env con credenciales
+# Variables de entorno con secrets (CRÍTICO: NUNCA COMMITEAR)
 .env
 .env.local
 .env.*.local
-.env.development.local
-.env.production.local
+.env.development
+.env.production
+.env.dev
+.env.prod
+backend/.env
+backend/.env.local
 
-# ============================================================================
-# 📦 ENTORNOS VIRTUALES
-# ============================================================================
-# No versionar los entornos virtuales (se regeneran con pip install -r requirements.txt)
+# Claves y certificados SSL/TLS
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+*.jks
+.certificates/
+certificates/
+
+# ==========================================
+# 🐍 PYTHON - CACHE Y COMPILADOS
+# ==========================================
+
+# Directorios de cache
+__pycache__/
+backend/__pycache__/
+backend/**/__pycache__/
+.Python
+*.py[cod]
+*$py.class
+*.so
+*.pyc
+*.pyo
+
+# Wheel distributions
+*.egg-info/
+*.egg
+.eggs/
+dist/
+build/
+*.whl
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual Environment (NUNCA incluir venv)
 venv/
 env/
 ENV/
 env.bak/
 venv.bak/
 .venv/
+.venv
+pip-requirements.txt
 
-# ============================================================================
+# PyCharm
+.pytype/
+
+# Poetry
+poetry.lock
+Pipfile.lock
+
+# ==========================================
+# 📦 ALEMBIC MIGRATIONS CACHE
+# ==========================================
+
+backend/alembic/__pycache__/
+alembic/__pycache__/
+alembic/versions/__pycache__/
+backend/alembic/versions/__pycache__/
+
+# ==========================================
+# 🧪 TESTING Y COVERAGE
+# ==========================================
+
+# pytest
+.pytest_cache/
+.pytest_tmp/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+test-results/
+xunit.xml
+coverage_report/
+
+# ==========================================
+# 🗂️ BASE DE DATOS
+# ==========================================
+
+# Bases de datos SQLite
+*.db
+*.sqlite
+*.sqlite3
+*.dbm
+
+# PostgreSQL en desarrollo
+postgres_data/
+pg_data/
+pgadmin_data/
+
+# Backups locales (excepto backup.sql del repo)
+database/backup_*.sql
+dump_*.sql
+export_*.sql
+*.backup
+
+# ==========================================
 # 💻 IDEs Y EDITORES
-# ============================================================================
-# JetBrains IDEs (PyCharm, WebStorm, etc.)
+# ==========================================
+
+# JetBrains (PyCharm, IntelliJ, WebStorm, etc.)
 .idea/
 *.iml
 *.iws
 *.ipr
-.DS_Store
+*.ics
+out/
+.idea_modules/
 
 # Visual Studio Code
 .vscode/
+.vscode-test/
 *.code-workspace
+jsconfig.json
+tsconfig.json
 
 # Sublime Text
 *.sublime-project
 *.sublime-workspace
+.sublime/
 
 # Vim
 *.swp
 *.swo
 *~
+.vim/
 
 # Emacs
 *~
-.#*
+\#*\#
+.\#*
+.emacs.d/
 
-# ============================================================================
-# 📊 PRUEBAS Y COBERTURA
-# ============================================================================
-.pytest_cache/
-.coverage
-coverage.xml
-htmlcov/
-.tox/
-.hypothesis/
+# Otros editores
+.project
+.pydevproject
+.settings/
+.netbeans/
+nbproject/
 
-# ============================================================================
-# 🗂️ BASES DE DATOS LOCALES
-# ============================================================================
-# Bases de datos SQLite (si se usan en desarrollo)
-*.db
-*.sqlite
-*.sqlite3
+# ==========================================
+# 📊 LOGS Y DEBUG
+# ==========================================
 
-# Archivos PostgreSQL en desarrollo
-postgres_data/
-pg_data/
-
-# ============================================================================
-# 📝 LOGS Y ARCHIVOS TEMPORALES
-# ============================================================================
-*.log
+# Logs
 logs/
-*.pot
-*.mo
-*.tmp
+*.log
+*.log.*
+error.log
+access.log
+debug.log
+app_logs/
+log/
 
-# ============================================================================
+# Debug
+debug/
+*.debug
+.debug/
+
+# ==========================================
 # 📂 SISTEMA OPERATIVO
-# ============================================================================
+# ==========================================
+
 # macOS
 .DS_Store
 .AppleDouble
 .LSOverride
 ._*
+.Spotlight-V100
+.Trashes
+.AppleDesktop
+Network Trash Folder
+Temporary Items
 
 # Windows
 Thumbs.db
-desktop.ini
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
 *.lnk
+thumbs.db
+[Dd]esktop.ini
 
 # Linux
-.Trash-*
 .directory
+.Trash-*
+*~
 
-# ============================================================================
-# 🚀 ARCHIVOS DE COMPILACIÓN Y BUILD
-# ============================================================================
-*.o
-*.a
-*.so
-*.dylib
-*.dll
-*.exe
-*.out
+# ==========================================
+# 🎨 ARCHIVOS TEMPORALES
+# ==========================================
 
-# ============================================================================
-# 🔧 OTROS ARCHIVOS TEMPORALES
-# ============================================================================
+# Archivos temp
+*.tmp
+*.temp
 *.bak
-*.backup
-*.swp
 .~*
-$RECYCLE.BIN/
+.backup.*
 
-# Archivos de configuración local (solo para desarrollo)
-local_config.py
-config.local.py
+# OS temp files
+tmp/
+temp/
+Temp/
+TEMP/
 
-# ============================================================================
-# 📄 NOTAS Y DOCUMENTACIÓN TEMPORAL
-# ============================================================================
-# Archivos TODO personales
-TODO_LOCAL.md
-NOTES_LOCAL.md
+# ==========================================
+# 🐳 DOCKER
+# ==========================================
 
-# ============================================================================
-# 🌐 DUMPS DE BASES DE DATOS LOCALES
-# ============================================================================
-# Nota: Los archivos SQL en /databse/ SÍ deben subirse (están en el repo)
-# Solo ignorar dumps locales
-backup.sql
-dump_*.sql
-export_*.sql
+# Docker
+.docker/
+docker-compose.override.yml
+.dockerignore
 
-# ============================================================================
-# 🔐 ARCHIVOS DE CERTIFICADOS Y CLAVES
-# ============================================================================
-*.pem
-*.key
-*.crt
-*.cert
-*.pfx
-
-# ============================================================================
-# 🎯 ESPECIFICO DEL PROYECTO
-# ============================================================================
-# ⚠️ CRÍTICO: Variables de entorno del backend (contiene credenciales sensibles)
-# NUNCA debes commitear estos archivos con datos reales
-backend/.env
-backend/.env.local
-backend/.env.*.local
-backend/.env.development.local
-backend/.env.production.local
-
-# Archivos compilados de Python en el backend
-backend/__pycache__/
-backend/**/__pycache__/
-backend/**/*.pyc
-
-# Cache de Alembic
-backend/alembic/__pycache__/
-alembic/__pycache__/
-alembic/versions/__pycache__/
+# ==========================================
+# 📝 ARCHIVOS ESPECÍFICOS DEL PROYECTO
+# ==========================================
 
 # Reportes generados localmente
 reportes_generados/
-*.csv.local
+reports/
 local_reports/
+*.csv.local
 
-# ============================================================================
-# 🔒 ARCHIVOS DE SEGURIDAD ADICIONALES
-# ============================================================================
-# Asegurar que ningún archivo .env sea commiteado accidentalmente
-.env*
+# Notas locales
+TODO_LOCAL.md
+NOTES_LOCAL.md
+notes.local.md
+
+# Caché local
+.cache/
+analytics_cache/
+*.cache
+
+# Archivos de configuración local
+local_config.py
+config.local.py
+settings.local.py
+dev_settings.py
+
+# ==========================================
+# 🌐 FRONTEND (si se incluye en repo)
+# ==========================================
+
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log*
+.pnp
+.pnp.js
+frontend/dist/
+frontend/build/
+
+# ==========================================
+# 📚 DOCUMENTACIÓN GENERADA
+# ==========================================
+
+# Sphinx documentation
+docs/_build/
+site/
+
+# Generated files
+*.mo
+*.pot
+
+# ==========================================
+# ⚠️ EXCEPCIONES - ARCHIVOS QUE SÍ SUBIR
+# ==========================================
+
+# Asegurar que estos archivos SE suban
+!.gitignore
 !.env.example
+!.env.template
+!.gitkeep
+!.github/
+!.gitattributes
 
-# Archivos temporales de IDEs
-.idea/
-.vscode/
-*.swp
-*.swo
-.DS_Store
+# Archivos del proyecto que deben ir
+!database/backup.sql
+!alembic/versions/
+!scripts/
+!requirements.txt
+!setup.py
+!README.md
 
-# Archivos de caché específicos del proyecto
-*.pyc
-__pycache__/
-*.egg-info/
+# ==========================================
+# 📝 REFERENCIAS
+# ==========================================
 
-# Archivos temporales generados por herramientas
-.coverage
-.pytest_cache/
-htmlcov/
-dist/
-build/
+# Archivos que NUNCA deben commitear:
+# - .env (credenciales sensibles)
+# - __pycache__/ (cache Python)
+# - venv/ (entorno virtual)
+# - *.pyc (compilados Python)
+# - .idea/ (configuración PyCharm)
+# - .vscode/ (configuración VSCode)
+# - *.log (archivos de log)
+# - *.egg-info/ (metadata de paquetes)
+#
+# Para forzar agregar un archivo ignorado:
+# git add -f archivo.txt
 

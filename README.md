@@ -1,99 +1,59 @@
-# AiresFlow Backend - UCC Montería
+# AiresFlow Analytics API
 
-AiresFlow es el núcleo (Backend) de la plataforma de gestión y analítica para el mantenimiento de sistemas de climatización de la Universidad Cooperativa de Colombia, Campus Montería. Este sistema trasciende el registro básico, integrando lógica de negocio avanzada y ciencia de datos para optimizar la vida útil de los activos institucionales.
+**Transformando registros manuales en inteligencia de negocio.**
+Una API RESTful diseñada para digitalizar, estructurar y analizar datos de mantenimiento de infraestructura térmica, eliminando la dependencia de hojas de cálculo fragmentadas.
 
----
+![Python](https://img.shields.io/badge/Python-3.11+-blue.svg?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.136-009688.svg?style=for-the-badge&logo=fastapi&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-12+-316192.svg?style=for-the-badge&logo=postgresql&logoColor=white)
+![Pandas](https://img.shields.io/badge/Pandas-Data_Analysis-150458.svg?style=for-the-badge&logo=pandas&logoColor=white)
 
-## Objetivo del Proyecto
+## Resumen del Proyecto
 
-Digitalizar el flujo de trabajo de mantenimiento (preventivo y correctivo), eliminando la dependencia de registros físicos y proporcionando al Jefe de Infraestructura una herramienta de toma de decisiones basada en datos reales y trazabilidad total.
+AiresFlow nace de una problemática operativa real: la pérdida de trazabilidad en los mantenimientos de equipos de aire acondicionado debido al uso de bitácoras físicas y transcripciones en Microsoft Excel. Esta deuda técnica generaba datos corruptos, mantenimientos puramente reactivos y altos costos operativos.
 
----
+Este proyecto backend soluciona el problema creando una única fuente de verdad (Single Source of Truth) mediante una base de datos relacional robusta. Además, incorpora un motor analítico que procesa los registros en tiempo real para generar KPIs estratégicos, preparando el terreno para futuros modelos de mantenimiento predictivo.
 
-## Stack Tecnológico
+## Arquitectura y Decisiones Técnicas
 
-- **Framework:** FastAPI (Asíncrono, alto rendimiento).
-- **ORM:** SQLAlchemy 2.0 (Mapeo de datos moderno).
-- **Base de Datos:** PostgreSQL.
-- **Procesamiento de Datos:** Pandas (Generación de KPIs y métricas).
-- **Seguridad:** JWT (JSON Web Tokens) & Bcrypt (Hashing de alta seguridad).
-- **Validación:** Pydantic v2.
+El sistema fue diseñado con una arquitectura en capas, priorizando la **calidad del dato** y la separación de responsabilidades:
 
----
+- **Data Modeling & ORM:** `SQLAlchemy 2.0` acoplado a `PostgreSQL`. Se diseñaron 14 modelos relacionales con restricciones de integridad estrictas (`UniqueConstraints`, `ForeignKeys`) para garantizar que la base de datos sea inmune a la duplicidad y a los errores de tipografía comunes en Excel.
+- **Data Validation (ETL ligero):** `Pydantic v2` actúa como la primera barrera de limpieza. Valida, sanitiza y transforma los payloads entrantes antes de que interactúen con la lógica de negocio.
+- **Analytics Engine:** Integración de `Pandas` en la capa de servicios (`MaintenanceAnalytics`). En lugar de sobrecargar la base de datos con agregaciones complejas, los datos históricos se procesan en memoria para calcular métricas como el ratio preventivo/correctivo y la salud global del parque térmico.
+- **Seguridad y Auditoría:** Autenticación mediante `JWT` y hashing de contraseñas con `Bcrypt`. Se implementó un modelo de auditoría (Caja Negra) para rastrear mutaciones críticas en los registros.
 
-## Arquitectura del Sistema
+## Lógica de Negocio Destacada
 
-El proyecto sigue una Arquitectura Modular, garantizando que el sistema sea escalable y fácil de mantener:
+Más allá del CRUD tradicional, AiresFlow automatiza los siguientes procesos clave:
 
-```
-backend/
-├── app/
-│   ├── api/          # Endpoints de la API REST
-│   ├── core/         # Configuración global y seguridad (JWT)
-│   ├── db/           # Conexión y base de datos
-│   ├── models/       # Modelos de SQLAlchemy (Tablas)
-│   ├── schemas/      # Modelos de Pydantic (Validación)
-│   └── services/     # Lógica de negocio y Analytics (Pandas)
-```
+1. **Semaforización Proactiva:** Endpoints especializados (`/alertas/vencidas`, `/alertas/proximas`) que evalúan los cronogramas en tiempo real para alertar sobre SLA incumplidos.
+2. **Auto-Programación Algorítmica:** Al cerrar un ticket de mantenimiento, el sistema utiliza la `frecuencia_dias` del activo para insertar automáticamente la siguiente intervención en la base de datos, creando un ciclo de vida continuo y autónomo.
+3. **Dashboard Endpoint Consolidado:** Un único endpoint (`/stats`) que orquesta múltiples consultas y cálculos de Pandas, entregando un JSON estructurado listo para ser consumido por herramientas de BI o librerías de visualización en el frontend.
 
----
+## Instalación y Entorno de Desarrollo
 
-## Características Implementadas (WIP)
-
-Actualmente, el backend cuenta con los cimientos operativos listos:
-
-- **Gestión de Activos:** Modelado completo de equipos, marcas y espacios con integridad referencial.
-- **Seguridad y RBAC:** Sistema de autenticación con Roles (Administrador, Técnico, Supervisor, Contratista).
-- **Motor de Analítica:** Implementación inicial de `MaintenanceAnalytics` usando Pandas para el cálculo de disponibilidad y salud del parque térmico.
-- **Auditoría:** Registro de trazabilidad para cambios críticos en el inventario.
-
----
-
-## Roadmap (Próximos Pasos)
-
-### Corto Plazo (Prioridad Operativa)
-
-- [ ] **Sistema de Notificaciones Híbrido:** Implementación de alertas web y notificaciones por correo para mantenimientos vencidos.
-- [ ] **Módulo de Auditoría Visual:** Interfaz para rastrear cambios en los activos (Caja Negra).
-
-### Mediano Plazo (Análisis y Seguridad)
-
-- [ ] **Exportación Inteligente:** Generador de archivos CSV/Excel optimizados para ingesta en Power BI.
-- [ ] **Seguridad 2FA:** Implementación de autenticación de dos factores para cuentas administrativas.
-
----
-
-## Instalación (Entorno de Desarrollo)
-
-1. Clonar el repositorio:
+El proyecto está preparado para ser clonado y ejecutado en entornos locales.
 
 ```bash
+# 1. Clonar el repositorio
 git clone https://github.com/tu-usuario/AiresFlow-Backend.git
-```
+cd AiresFlow-Backend
 
-2. Crear entorno virtual:
-
-```bash
+# 2. Crear y activar entorno virtual
 python -m venv venv
-source venv/bin/scripts/activate  # En Windows: venv\Scripts\activate
-```
+source venv/bin/activate  # En Windows: venv\Scripts\activate
 
-3. Instalar dependencias:
-
-```bash
+# 3. Instalar dependencias
 pip install -r requirements.txt
+
+# 4. Configurar variables de entorno
+cp .env.example .env
+# (Edita el archivo .env con tus credenciales de PostgreSQL)
+
+# 5. Ejecutar migraciones de base de datos
+alembic upgrade head
+
+# 6. Levantar el servidor de desarrollo
+uvicorn app.main:app --reload
 ```
-
-4. Configurar variables de entorno: Crear un archivo `.env` basado en `.env.example` con tus credenciales de PostgreSQL y `SECRET_KEY`.
-
----
-
-## Autor
-
-**Valentina Ojeda Pascasio**  
-Estudiante de Ingeniería de Sistemas - Universidad Cooperativa de Colombia  
-Montería, Córdoba.
-
----
-
-*Este proyecto es propiedad intelectual para la gestión de infraestructura de la UCC Montería.*
