@@ -4,13 +4,14 @@ Esquemas Pydantic para la entidad Mantenimiento.
 Este módulo define los contratos de validación de datos para:
 - Creación de registros de mantenimiento
 - Actualización de datos de mantenimiento
-- Respuestas seguras (auditoría y trazabilidad)
+- Respuestas planas y seguras (SIN relaciones anidadas complejas)
 - Enumeraciones de estados de mantenimiento
 
 Arquitectura:
 - Validación estricta con Pydantic v2
-- Tipos anidados para relaciones (técnico, equipo, tipo)
+- Base de datos PLANA: solo IDs y valores directos en respuestas
 - Timestamps automáticos de BD (no cliente)
+- Sincronización exacta con modelo SQLAlchemy
 - Documentación completa con ejemplos
 """
 
@@ -69,6 +70,11 @@ class MantenimientoBase(BaseModel):
         None,
         max_length=1000,
         description="Descripción detallada del trabajo realizado"
+    )
+    costo_servicio: float = Field(
+        default=0.0,
+        ge=0,
+        description="Costo del servicio técnico en pesos"
     )
 
 
@@ -148,26 +154,28 @@ class TipoMantenimientoResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class MantenimientoResponse(MantenimientoBase):
+class MantenimientoResponse(BaseModel):
     """
     Esquema para devolver datos de mantenimiento de forma segura.
 
-    Seguridad Crítica:
+    SIMPLIFICADO PARA BASE DE DATOS PLANA:
     - from_attributes=True: Permite crear desde objeto SQLAlchemy
-    - NO incluye datos sensibles
-    - Solo devuelve campos "públicos"
-    - Incluye relaciones anidadas (equipo, técnico, tipo)
+    - Devuelve SOLO datos planos (IDs y valores directos)
+    - SIN relaciones anidadas complejas que causen errores de validación
+    - Campos exactamente como en la tabla de BD
 
     Auditoría:
     - Timestamps de creación para rastrabilidad
-    - IDs de técnico y registrador para auditoría
+    - IDs de técnico, encargado, equipo y tipo para referencias
     """
     id: int = Field(..., description="Identificador único del registro")
-    fecha_mantenimiento: date
-    equipo: Optional[EquipoResumenMantenimiento]
-    encargado: Optional[UsuarioResumenMantenimiento]
-    tipo_mantenimiento: Optional[TipoMantenimientoResponse]
-    registrador: Optional[UsuarioResumenMantenimiento]
+    fecha_mantenimiento: date = Field(..., description="Fecha del mantenimiento (YYYY-MM-DD)")
+    detalle_mantenimiento: Optional[str] = Field(None, description="Descripción del trabajo realizado")
+    costo_servicio: float = Field(..., ge=0, description="Costo del servicio técnico en pesos")
+    equipo_id: int = Field(..., gt=0, description="ID del equipo mantenido")
+    encargado_id: int = Field(..., gt=0, description="ID del técnico que realizó el mantenimiento")
+    tipo_mantenimiento_id: int = Field(..., gt=0, description="ID del tipo de mantenimiento")
+    registrado_por: int = Field(..., gt=0, description="ID del usuario que registró el mantenimiento")
     created_at: datetime = Field(..., description="Timestamp de creación del registro")
 
     model_config = ConfigDict(from_attributes=True)

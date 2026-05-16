@@ -200,9 +200,10 @@ def crear_mantenimiento(
 
     Flujo Completo:
     1. Validar que equipo existe
-    2. Crear registro de mantenimiento
-    3. Cambiar estado del equipo a "Operativo" (fin de reparación)
-    4. Persistir cambios atómicamente
+    2. Crear registro de mantenimiento (con costo_servicio)
+    3. Actualizar fechas de mantenimiento del equipo (ultima_fecha y proxima_fecha)
+    4. Cambiar estado del equipo a "Operativo" (fin de reparación)
+    5. Persistir cambios atómicamente
 
     Args:
         db (Session): Sesión de SQLAlchemy con transacción activa
@@ -224,6 +225,7 @@ def crear_mantenimiento(
         ...     tipo_mantenimiento_id=1,
         ...     registrado_por=3,
         ...     detalle_mantenimiento="Limpieza de filtros y recarga de refrigerante",
+        ...     costo_servicio=Decimal('150.00'),
         ...     fecha_mantenimiento=date.today()
         ... )
         >>> nuevo_mant = crear_mantenimiento(db, mant_in)
@@ -235,19 +237,25 @@ def crear_mantenimiento(
         if not equipo:
             raise ValueError(f"Equipo con ID {mantenimiento_in.equipo_id} no existe")
 
-        # 2. CREAR REGISTRO DE MANTENIMIENTO
+        # 2. CREAR REGISTRO DE MANTENIMIENTO (incluye costo_mano_obra)
         datos = mantenimiento_in.model_dump()
         nuevo_mantenimiento = Mantenimiento(**datos)
         db.add(nuevo_mantenimiento)
 
-        # 3. ** CAMBIAR ESTADO DEL EQUIPO A "OPERATIVO" **
+        # 3. ** AUTOMATIZACIÓN CRÍTICA DE FECHAS **
+        # Actualiza las fechas del equipo después de mantenimiento
+        # Usa la fecha del registro de mantenimiento, no la fecha actual del sistema
+        equipo.ultima_fecha = mantenimiento_in.fecha_mantenimiento
+        equipo.proxima_fecha = mantenimiento_in.fecha_mantenimiento + timedelta(days=90)
+
+        # 4. ** CAMBIAR ESTADO DEL EQUIPO A "OPERATIVO" **
         # NOTA: Esta es la lógica crítica de negocio
         # Si estaba "En reparación" o "Inactivo", pasa a "Operativo"
         # Registra en auditoría que fue mantenido
         equipo.estado = "Operativo"
         equipo.updated_at = datetime.now()
 
-        # 4. PERSISTIR CAMBIOS DE MANERA ATÓMICA
+        # 5. PERSISTIR CAMBIOS DE MANERA ATÓMICA
         db.commit()
         db.refresh(nuevo_mantenimiento)
 

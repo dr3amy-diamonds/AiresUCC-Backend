@@ -1,10 +1,24 @@
 """
-Esquemas Pydantic para la entidad Usuario.
+Esquemas Pydantic para la entidad Usuario (tabla: encargados).
 
 Este módulo define los contratos de validación de datos para:
-- Registro e ingreso de usuarios
+- Registro e ingreso de usuarios (encargados)
 - Respuestas seguras (sin exponer hashed_password)
 - Autenticación y tokens
+- Sincronización exacta con tabla encargados de BD
+
+Campos mapeados a tabla:
+- usuario.id → encargados.id
+- usuario.nombre → encargados.nombre
+- usuario.apellido → encargados.apellido
+- usuario.correo_institucional → encargados.correo_institucional
+- usuario.hashed_password → encargados.hashed_password
+- usuario.codigo_universitario → encargados.codigo_universitario
+- usuario.telefono → encargados.telefono
+- usuario.tipo_rol → encargados.tipo_rol
+- usuario.activo → encargados.activo
+- usuario.created_at → encargados.created_at
+- usuario.updated_at → encargados.updated_at
 """
 
 from datetime import datetime
@@ -18,12 +32,17 @@ from enum import Enum
 # ============================================================================
 
 class TipoRolSchema(str, Enum):
-    """Roles disponibles en el sistema (debe coincidir con TipoRol del modelo)."""
-    TECNICO_INTERNO = "Tecnico interno"
-    SUPERVISOR = "Supervisor"
-    ADMINISTRADOR = "Administrador"
-    CONTRATISTA = "Contratista"
-    SOLO_LECTURA = "Solo lectura"
+    """
+    Roles disponibles en el sistema.
+
+    Solo 3 roles permitidos, mapeados a la tabla encargados:
+    - Jefe de Infraestructura: Máximos privilegios (equivalente a Admin)
+    - Auxiliar de Infraestructura: Privilegios limitados
+    - Tecnico: Técnico operativo
+    """
+    JEFE_INFRAESTRUCTURA = "Jefe de Infraestructura"
+    AUXILIAR_INFRAESTRUCTURA = "Auxiliar de Infraestructura"
+    TECNICO = "Tecnico"
 
 
 # ============================================================================
@@ -36,20 +55,45 @@ class UsuarioBase(BaseModel):
 
     Contiene los atributos esenciales del usuario que son compartidos
     entre creación y respuesta (excepto hashed_password que nunca sale).
+
+    Mapeado con tabla encargados:
+    - nombre: primer nombre
+    - apellido: apellido del usuario
+    - correo_institucional: correo único (NO correo)
+    - telefono: número de contacto
+    - codigo_universitario: ID institucional (opcional en algunos contextos)
+    - tipo_rol: solo los 3 roles permitidos
+    - activo: estado del usuario
     """
     nombre: str = Field(
         ...,
         min_length=1,
-        max_length=100,
-        description="Nombre completo del usuario (1-100 caracteres)"
+        max_length=30,
+        description="Primer nombre del usuario (1-30 caracteres)"
     )
-    correo: EmailStr = Field(
+    apellido: str = Field(
         ...,
-        description="Correo institucional único. Validado con EmailStr para evitar inyecciones de datos inválidos"
+        min_length=1,
+        max_length=30,
+        description="Apellido del usuario (1-30 caracteres)"
+    )
+    correo_institucional: EmailStr = Field(
+        ...,
+        description="Correo institucional único (NO correo simple). Validado con EmailStr."
+    )
+    telefono: str = Field(
+        ...,
+        min_length=7,
+        max_length=12,
+        description="Teléfono de contacto del usuario (formato: 7-12 caracteres)"
+    )
+    codigo_universitario: Optional[int] = Field(
+        default=None,
+        description="Código universitario/ID institucional numérico (opcional, debe ser único si se proporciona)"
     )
     tipo_rol: TipoRolSchema = Field(
-        default=TipoRolSchema.TECNICO_INTERNO,
-        description="Rol asignado: Administrador, Técnico, Supervisor o Contratista"
+        default=TipoRolSchema.TECNICO,
+        description="Rol asignado: Jefe de Infraestructura (Admin), Auxiliar o Tecnico"
     )
     activo: bool = Field(
         default=True,
@@ -59,7 +103,7 @@ class UsuarioBase(BaseModel):
 
 class UsuarioCreate(UsuarioBase):
     """
-    Esquema para la creación de nuevos usuarios.
+    Esquema para la creación de nuevos usuarios (encargados).
 
     Hereda de UsuarioBase y agrega el campo 'password' (en texto plano).
     ¡CRÍTICO! Este campo JAMÁS debe salir del backend sin ser hasheado.
@@ -68,7 +112,8 @@ class UsuarioCreate(UsuarioBase):
     Validación Pydantic:
     - Previene que un cliente envíe hashed_password directamente
     - Valida formato de email antes de llegar a la BD
-    - Asegura que rol sea uno de los valores permitidos (Enum)
+    - Asegura que rol sea uno de los 3 valores permitidos (Enum)
+    - Valida que correo_institucional (NO correo) sea proporcionado
     """
     password: str = Field(
         ...,
@@ -82,7 +127,7 @@ class UsuarioCreate(UsuarioBase):
 # ESQUEMAS DE RESPUESTA (SEGUROS)
 # ============================================================================
 
-class UsuarioResponse(UsuarioBase):
+class UsuarioResponse(BaseModel):
     """
     Esquema para devolver datos de usuario de forma segura.
 
@@ -90,6 +135,7 @@ class UsuarioResponse(UsuarioBase):
     - from_attributes=True: Permite crear el modelo desde un objeto SQLAlchemy
     - NO incluye 'password' ni 'hashed_password' en la respuesta
     - Solo devuelve campos "públicos" que pueden mostrarse al cliente
+    - Mapeado exactamente con campos de tabla encargados
 
     Pydantic previene accidentalmente exponer secrets al:
     - Usar este esquema como "contrato" de salida
@@ -97,10 +143,13 @@ class UsuarioResponse(UsuarioBase):
     - Permitir que solo estos campos específicos salgan del backend
     """
     id: int = Field(..., description="Identificador único del usuario")
-    nombre: str
-    correo: EmailStr
-    tipo_rol: TipoRolSchema
-    activo: bool
+    nombre: str = Field(..., description="Primer nombre del usuario")
+    apellido: str = Field(..., description="Apellido del usuario")
+    correo_institucional: EmailStr = Field(..., description="Correo institucional (NO correo)")
+    telefono: str = Field(..., description="Teléfono de contacto")
+    codigo_universitario: Optional[int] = Field(None, description="Código universitario/ID institucional numérico")
+    tipo_rol: TipoRolSchema = Field(..., description="Rol asignado")
+    activo: bool = Field(..., description="Estado del usuario (activo/inactivo)")
     created_at: datetime = Field(..., description="Timestamp de creación del registro")
     updated_at: datetime = Field(..., description="Timestamp de última actualización")
 
@@ -147,15 +196,15 @@ class TokenData(BaseModel):
     Contiene los datos mínimos necesarios para autorización.
 
     DISEÑO:
-    - Email como identificador único (no ID, ya que email es único)
+    - correo_institucional como identificador único (no ID, ya que email es único)
     - Rol para control de acceso basado en roles (RBAC)
     - Estos datos NO se modifican sin revalidación
     """
-    email: EmailStr = Field(
+    correo_institucional: EmailStr = Field(
         ...,
-        description="Email del usuario autenticado (del JWT)"
+        description="Correo institucional del usuario autenticado (del JWT)"
     )
-    rol: TipoRolSchema = Field(
+    tipo_rol: TipoRolSchema = Field(
         ...,
         description="Rol del usuario para autorización en endpoints"
     )
@@ -166,12 +215,13 @@ class UsuarioLogin(BaseModel):
     Esquema para el login (credenciales).
 
     Validación:
-    - Email validado con EmailStr (previene inyecciones)
+    - correo_institucional validado con EmailStr (previene inyecciones)
     - Password es string, se comparará con hash en BD
+    - Debe usarse correo_institucional (NO correo simple)
     """
-    correo: EmailStr = Field(
+    correo_institucional: EmailStr = Field(
         ...,
-        description="Correo institucional del usuario"
+        description="Correo institucional del usuario (NO correo simple)"
     )
     password: str = Field(
         ...,
@@ -190,13 +240,27 @@ class UsuarioUpdate(BaseModel):
     IMPORTANTE:
     - Todos los campos son opcionales (Optional)
     - NO incluye password (se actualiza en endpoint separado)
+    - Permite actualizar: nombre, apellido, telefono, tipo_rol, activo
+    - NO permite cambiar correo_institucional directamente (por auditoría)
     - Pydantic valida que solo estos campos permitidos se actualicen
     """
     nombre: Optional[str] = Field(
         None,
         min_length=1,
-        max_length=100,
+        max_length=30,
         description="Nuevo nombre (opcional)"
+    )
+    apellido: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=30,
+        description="Nuevo apellido (opcional)"
+    )
+    telefono: Optional[str] = Field(
+        None,
+        min_length=7,
+        max_length=12,
+        description="Nuevo teléfono (opcional)"
     )
     tipo_rol: Optional[TipoRolSchema] = Field(
         None,

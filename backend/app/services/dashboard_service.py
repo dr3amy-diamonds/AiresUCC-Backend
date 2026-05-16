@@ -319,11 +319,17 @@ def obtener_equipos_problematicos(
 def obtener_carga_tecnicos(
     db: Session,
     fecha_desde: Optional[date] = None,
+    limit: int = 10,
 ) -> List[Dict[str, Any]]:
     """
     Analiza carga de trabajo de técnicos (mantenimientos realizados).
     
     Útil para balanceo de recursos.
+    
+    Args:
+        db (Session): Sesión de SQLAlchemy
+        fecha_desde (Optional[date]): Período de análisis (default: últimos 30 días)
+        limit (int): Top N técnicos a retornar (default: 10)
     
     Returns:
         List[Dict]: Técnicos con sus estadísticas de carga
@@ -341,6 +347,7 @@ def obtener_carga_tecnicos(
         .filter(Mantenimiento.fecha_mantenimiento >= fecha_desde)
         .group_by(Usuario.id, Usuario.nombre)
         .order_by(func.count(Mantenimiento.id).desc())
+        .limit(limit)
         .all()
     )
     
@@ -359,12 +366,91 @@ def obtener_carga_tecnicos(
 # COMPOSITE: DASHBOARD COMPLETO
 # ============================================================================
 
+def calcular_kpis_financieros_y_mantenimiento(db: Session) -> Dict[str, Any]:
+    """
+    Calcula KPIs específicos para análisis financiero y alertas de mantenimiento.
+
+    KPIs Incluidos:
+    - Gasto Total: Sumatoria de costo_mano_obra en mantenimientos
+    - Capacidad Instalada Total: Sumatoria de tonelaje en equipos
+    - Alertas de Mantenimiento: Equipos con proxima_fecha vencida, a punto de vencer, o sin fecha
+
+    Returns:
+        Dict: {
+            'gasto_total': float,
+            'capacidad_instalada_total': float,
+            'equipos_alerta_mantenimiento': int,
+            'equipos_mantenimiento_vencido': int,
+            'equipos_a_punto_vencer': int,
+            'equipos_sin_fecha_proxima': int,
+        }
+    """
+    # 1. GASTO TOTAL: Suma de costo_mano_obra
+    gasto_total = (
+        db.query(func.sum(Mantenimiento.costo_mano_obra))
+        .scalar() or 0
+    )
+    gasto_total = float(gasto_total) if gasto_total else 0.0
+
+    # 2. CAPACIDAD INSTALADA TOTAL: Suma de tonelaje
+    capacidad_total = (
+        db.query(func.sum(Equipo.tonelaje))
+        .scalar() or 0
+    )
+    capacidad_total = float(capacidad_total) if capacidad_total else 0.0
+
+    # 3. ALERTAS DE MANTENIMIENTO: Equipos con proxima_fecha vencida, a punto de vencer, o nula
+    fecha_actual = datetime.now().date()
+    fecha_alerta = fecha_actual + timedelta(days=15)
+
+    # Equipos con proxima_fecha menor a hoy (vencidos)
+    equipos_vencidos = (
+        db.query(func.count(Equipo.id))
+        .filter(
+            Equipo.proxima_fecha < fecha_actual,
+            Equipo.proxima_fecha.isnot(None)
+        )
+        .scalar() or 0
+    )
+
+    # Equipos a punto de vencer (proxima_fecha entre hoy y hoy+15 días)
+    equipos_a_punto_vencer = (
+        db.query(func.count(Equipo.id))
+        .filter(
+            Equipo.proxima_fecha >= fecha_actual,
+            Equipo.proxima_fecha <= fecha_alerta,
+            Equipo.proxima_fecha.isnot(None)
+        )
+        .scalar() or 0
+    )
+
+    # Equipos sin fecha próxima definida (acción requerida)
+    equipos_sin_fecha = (
+        db.query(func.count(Equipo.id))
+        .filter(Equipo.proxima_fecha.is_(None))
+        .scalar() or 0
+    )
+
+    # Total de equipos en alerta
+    equipos_alerta = equipos_vencidos + equipos_a_punto_vencer + equipos_sin_fecha
+
+    return {
+        "gasto_total": gasto_total,
+        "capacidad_instalada_total": capacidad_total,
+        "equipos_alerta_mantenimiento": equipos_alerta,
+        "equipos_mantenimiento_vencido": equipos_vencidos,
+        "equipos_a_punto_vencer": equipos_a_punto_vencer,
+        "equipos_sin_fecha_proxima": equipos_sin_fecha,
+    }
+
+
 def generar_dashboard_completo(db: Session) -> Dict[str, Any]:
     """
     Genera un dashboard ejecutivo completo con todos los KPIs.
     
     Este es el ENDPOINT PRINCIPAL para /api/v1/stats.
-    
+    Incluye: disponibilidad, cumplimiento preventivo, KPIs financieros y alertas de mantenimiento.
+
     Returns:
         Dict: Estructura JSON lista para serializar a cliente
     """
@@ -376,6 +462,9 @@ def generar_dashboard_completo(db: Session) -> Dict[str, Any]:
     cumplimiento = calcular_cumplimiento_preventivo(db)
     programaciones = obtener_programaciones_estado(db)
     
+    # KPIs financieros y de mantenimiento (NUEVOS)
+    kpis_financieros = calcular_kpis_financieros_y_mantenimiento(db)
+
     # Datos detallados
     equipos_problematicos = obtener_equipos_problematicos(db, limit=5)
     carga_tecnicos = obtener_carga_tecnicos(db, limit=5)
@@ -391,9 +480,19 @@ def generar_dashboard_completo(db: Session) -> Dict[str, Any]:
         "resumen_disponibilidad": disponibilidad,
         "cumplimiento_preventivo": cumplimiento,
         "programaciones_estado": programaciones,
+        "kpis_financieros": {
+            "gasto_total_mano_obra": kpis_financieros["gasto_total"],
+            "capacidad_instalada_total_toneladas": kpis_financieros["capacidad_instalada_total"],
+        },
         "alertas": {
             "equipos_problematicos": equipos_problematicos,
             "carga_tecnicos": carga_tecnicos,
+            "mantenimiento": {
+                "equipos_en_alerta": kpis_financieros["equipos_alerta_mantenimiento"],
+                "equipos_vencidos": kpis_financieros["equipos_mantenimiento_vencido"],
+                "equipos_a_punto_vencer": kpis_financieros["equipos_a_punto_vencer"],
+                "equipos_sin_fecha": kpis_financieros["equipos_sin_fecha_proxima"],
+            },
         },
         "metricas_pandas": {
             "conteo_fallas_por_equipo": resumen_analytics.conteo_fallas_por_equipo,

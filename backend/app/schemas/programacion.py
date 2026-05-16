@@ -1,21 +1,26 @@
 """
 Esquemas Pydantic para la entidad Programación de Mantenimiento.
 
+IMPORTANTE: Estos esquemas mapean EXACTAMENTE las columnas que existen en PostgreSQL.
+NO incluyen observaciones ni created_at (columnas que no existen en la BD física).
+
+Columnas reales de la tabla gestion_aires_ucc.programaciones:
+- id, fecha_programada, equipo_id, encargado_id, tipo_mantenimiento_id, estado, mantenimiento_id
+
 Este módulo define los contratos de validación de datos para:
 - Creación de programaciones de mantenimiento
-- Actualización de programaciones (cambios de estado, observaciones, etc)
+- Actualización de programaciones (cambios de estado, etc)
 - Respuestas seguras con información de relaciones (equipo, encargado, tipo)
 - Enumeraciones de estados de programación
 
 Arquitectura:
 - Validación estricta con Pydantic v2
 - Tipos anidados para relaciones (equipo, usuario, tipo mantenimiento)
-- Timestamps automáticos de BD (no cliente)
 - Documentación completa con ejemplos
 - Validación de IDs mayores a cero para integridad referencial
 """
 
-from datetime import datetime, date
+from datetime import date
 from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
@@ -71,17 +76,12 @@ class ProgramacionCreate(ProgramacionBase):
     Validación Pydantic:
     - Todos los IDs foráneos deben ser positivos (gt=0)
     - La fecha debe ser válida y de tipo date
-    - Las observaciones son opcionales
     - El estado inicial se establece en BD (no en cliente)
 
     Nota: El estado inicial es "Pendiente" y se asigna automáticamente
     en el modelo de base de datos (no acepta estado en POST).
     """
-    observaciones: Optional[str] = Field(
-        None,
-        max_length=1000,
-        description="Observaciones adicionales sobre la programación (opcional, máximo 1000 caracteres)"
-    )
+    pass
 
 
 class ProgramacionUpdate(BaseModel):
@@ -120,11 +120,6 @@ class ProgramacionUpdate(BaseModel):
         gt=0,
         description="ID del mantenimiento asociado (opcional, debe ser > 0)"
     )
-    observaciones: Optional[str] = Field(
-        None,
-        max_length=1000,
-        description="Actualizar observaciones (opcional, máximo 1000 caracteres)"
-    )
 
     model_config = ConfigDict(extra="forbid")  # Rechaza campos no definidos
 
@@ -157,7 +152,7 @@ class TipoMantenimientoProgramacion(BaseModel):
     """Mini-esquema para tipo de mantenimiento en respuesta de programación."""
     id: int
     nombre: str
-    frecuencia_dias: Optional[int]
+    frecuencia_dias: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -165,7 +160,7 @@ class TipoMantenimientoProgramacion(BaseModel):
 class MantenimientoResumenProgramacion(BaseModel):
     """Mini-esquema para mantenimiento asociado en respuesta de programación."""
     id: int
-    detalle_mantenimiento: Optional[str]
+    detalle_mantenimiento: Optional[str] = None
     fecha_mantenimiento: date
 
     model_config = ConfigDict(from_attributes=True)
@@ -177,23 +172,26 @@ class ProgramacionResponse(ProgramacionBase):
 
     Seguridad Crítica:
     - from_attributes=True: Permite crear desde objeto SQLAlchemy ORM
-    - NO incluye datos sensibles
-    - Solo devuelve campos "públicos"
-    - Incluye relaciones anidadas con mini-esquemas (equipo, técnico, tipo)
+    - Solo devuelve campos públicos (NO datos sensibles)
+    - Incluye relaciones anidadas con mini-esquemas
 
-    Auditoría y Trazabilidad:
-    - Timestamps de creación y actualización
-    - Estado actual de la programación
-    - Información sobre el equipo y responsables
+    IMPORTANTE:
+    - NO incluye observaciones (columna inexistente)
+    - NO incluye created_at (columna inexistente)
+    - NO incluye updated_at (columna inexistente)
 
     Estructura:
-    - Hereda campos de ProgramacionBase
-    - Agrega id, estado, relaciones anidadas y timestamps
+    - Hereda campos de ProgramacionBase (fecha_programada, equipo_id, encargado_id, tipo_mantenimiento_id)
+    - Agrega: id, estado, relaciones anidadas
     """
     id: int = Field(..., description="Identificador único de la programación")
     estado: EstadoProgramacionEnum = Field(
         ...,
         description="Estado actual: Pendiente, Completado, Cancelado, Vencido"
+    )
+    mantenimiento_id: Optional[int] = Field(
+        None,
+        description="ID del mantenimiento asociado (si aplica)"
     )
     equipo: Optional[EquipoResumenProgramacion] = Field(
         None,
@@ -211,12 +209,6 @@ class ProgramacionResponse(ProgramacionBase):
         None,
         description="Información resumida del mantenimiento realizado (si aplica)"
     )
-    observaciones: Optional[str] = Field(
-        None,
-        description="Observaciones registradas en la programación"
-    )
-    created_at: datetime = Field(..., description="Timestamp de creación del registro")
-    updated_at: datetime = Field(..., description="Timestamp de última actualización")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -392,7 +384,7 @@ def actualizar_programacion(
     
     Campos actualizables:
     - fecha_programada, estado, encargado_id
-    - tipo_mantenimiento_id, mantenimiento_id, observaciones
+    - tipo_mantenimiento_id, mantenimiento_id
     '''
     programacion = programacion_service.actualizar(
         db, id_programacion, programacion_in, usuario_actual.id
@@ -425,7 +417,6 @@ VALIDACIÓN DE CAMPOS:
 - `equipo_id`: int > 0, requerido. Valida existencia en FK
 - `encargado_id`: int > 0, requerido. Debe ser usuario técnico
 - `tipo_mantenimiento_id`: int > 0, requerido. Valida existencia
-- `observaciones`: str, opcional, máximo 1000 caracteres
 - `estado`: Solo en Update/Response. Valores: Pendiente, Completado, Cancelado, Vencido
 - `mantenimiento_id`: int > 0, opcional. Para vincular a mantenimiento realizado
 
@@ -443,8 +434,7 @@ POST /api/v1/programaciones/
     "fecha_programada": "2026-06-15",
     "equipo_id": 5,
     "encargado_id": 3,
-    "tipo_mantenimiento_id": 1,
-    "observaciones": "Revisar los componentes críticos y cambiar aceite"
+    "tipo_mantenimiento_id": 1
 }
 
 EJEMPLO DE RESPONSE (201 Created):
@@ -456,7 +446,7 @@ EJEMPLO DE RESPONSE (201 Created):
     "equipo_id": 5,
     "encargado_id": 3,
     "tipo_mantenimiento_id": 1,
-    "observaciones": "Revisar los componentes críticos y cambiar aceite",
+    "mantenimiento_id": null,
     "equipo": {
         "id": 5,
         "codigo_activo": "EQ-0005",
@@ -467,16 +457,14 @@ EJEMPLO DE RESPONSE (201 Created):
         "id": 3,
         "nombre": "Juan García López",
         "correo_institucional": "juan.garcia@ucc.edu.co",
-        "tipo_rol": "Tecnico interno"
+        "tipo_rol": "Tecnico"
     },
     "tipo_mantenimiento": {
         "id": 1,
         "nombre": "Preventivo",
         "frecuencia_dias": 30
     },
-    "mantenimiento": null,
-    "created_at": "2026-05-05T10:30:45.123456",
-    "updated_at": "2026-05-05T10:30:45.123456"
+    "mantenimiento": null
 }
 
 EJEMPLO DE UPDATE:
@@ -484,7 +472,6 @@ EJEMPLO DE UPDATE:
 PATCH /api/v1/programaciones/42
 {
     "estado": "Completado",
-    "mantenimiento_id": 15,
-    "observaciones": "Mantenimiento completado exitosamente"
+    "mantenimiento_id": 15
 }
 """

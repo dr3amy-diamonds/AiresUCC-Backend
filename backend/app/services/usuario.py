@@ -59,23 +59,23 @@ def obtener_usuario_por_id(db: Session, usuario_id: int) -> Optional[Usuario]:
     return db.query(Usuario).filter(Usuario.id == usuario_id).first()
 
 
-def obtener_usuario_por_email(db: Session, correo: str) -> Optional[Usuario]:
+def obtener_usuario_por_email(db: Session, correo_institucional: str) -> Optional[Usuario]:
     """
-    Obtiene un usuario de la base de datos por su correo electrónico.
+    Obtiene un usuario de la base de datos por su correo institucional.
 
-    La búsqueda por email es crítica para autenticación (login) y validación
+    La búsqueda por correo_institucional es crítica para autenticación (login) y validación
     de duplicados. PostgreSQL garantiza que cada correo es único mediante
-    la restricción UniqueConstraint 'uq_usuario_correo'.
+    la restricción UniqueConstraint 'uq_encargado_correo'.
 
     Args:
         db (Session): Sesión de SQLAlchemy para ejecutar la consulta.
-        correo (str): Correo institucional del usuario (validado por Pydantic como EmailStr).
+        correo_institucional (str): Correo institucional del usuario (validado por Pydantic como EmailStr).
 
     Returns:
         Optional[Usuario]: Objeto Usuario si existe, None en caso contrario.
 
     Integridad PostgreSQL:
-        - Índice UNIQUE: uq_usuario_correo garantiza máximo 1 resultado
+        - Índice UNIQUE: uq_encargado_correo garantiza máximo 1 resultado
         - Correo es inmutable una vez creado (en lógica de negocio)
         - La comparación es case-sensitive según configuración de la BD
 
@@ -84,7 +84,7 @@ def obtener_usuario_por_email(db: Session, correo: str) -> Optional[Usuario]:
         >>> if usuario:
         ...     print(f"¡Bienvenido {usuario.nombre}!")
     """
-    return db.query(Usuario).filter(Usuario.correo == correo).first()
+    return db.query(Usuario).filter(Usuario.correo_institucional == correo_institucional).first()
 
 
 def obtener_usuarios(
@@ -163,8 +163,11 @@ def crear_usuario(db: Session, usuario_in: UsuarioCreate) -> Usuario:
     Args:
         db (Session): Sesión de SQLAlchemy con transacción activa.
         usuario_in (UsuarioCreate): Esquema validado de Pydantic con:
-                                     - nombre (1-100 chars)
-                                     - correo (EmailStr validado)
+                                     - nombre (1-30 chars)
+                                     - apellido (1-30 chars)
+                                     - correo_institucional (EmailStr validado)
+                                     - telefono (7-12 chars)
+                                     - codigo_universitario (opcional)
                                      - password (8-255 chars, a hashear)
                                      - tipo_rol (Enum validado)
                                      - activo (bool, default=True)
@@ -249,7 +252,7 @@ def crear_usuario(db: Session, usuario_in: UsuarioCreate) -> Usuario:
         # (ej: convertiéndola en HTTP 409 Conflict si es duplicate email)
         raise IntegrityError(
             statement="Fallo al crear usuario",
-            params={"correo": usuario_in.correo},
+            params={"correo_institucional": usuario_in.correo_institucional},
             orig=e.orig
         ) from e
 
@@ -366,15 +369,15 @@ def actualizar_usuario(
 # FUNCIONES AUXILIARES (UTILITIES)
 # ============================================================================
 
-def usuario_existe(db: Session, correo: str, excluir_id: Optional[int] = None) -> bool:
+def usuario_existe(db: Session, correo_institucional: str, excluir_id: Optional[int] = None) -> bool:
     """
-    Verifica si un correo ya está registrado en la BD (útil para validaciones).
+    Verifica si un correo institucional ya está registrado en la BD (útil para validaciones).
 
     Usado en endpoints para prevenir duplicados antes de intentar crear.
 
     Args:
         db (Session): Sesión de SQLAlchemy.
-        correo (str): Correo a verificar.
+        correo_institucional (str): Correo institucional a verificar.
         excluir_id (Optional[int]): Si se proporciona, excluye ese ID de la búsqueda
                                     (útil en updates para permitir mantener el email).
 
@@ -385,7 +388,7 @@ def usuario_existe(db: Session, correo: str, excluir_id: Optional[int] = None) -
         >>> if usuario_existe(db, "juan@ucc.edu.co"):
         ...     return HTTPException(400, "Email ya registrado")
     """
-    query = db.query(Usuario).filter(Usuario.correo == correo)
+    query = db.query(Usuario).filter(Usuario.correo_institucional == correo_institucional)
 
     if excluir_id is not None:
         query = query.filter(Usuario.id != excluir_id)

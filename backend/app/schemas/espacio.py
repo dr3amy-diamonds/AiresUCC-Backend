@@ -105,8 +105,8 @@ class EspacioUpdate(BaseModel):
 class BloqueResumenEspacio(BaseModel):
     """Mini-esquema para bloque en respuesta de espacio."""
     id: int
-    nombre: str
     codigo_bloque: str
+    nombre_bloque: str
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -127,11 +127,11 @@ class EspacioResponse(EspacioBase):
     - ID único para rastreabilidad
     - Código espacial para búsquedas rápidas
     - Nombre descriptivo
-    - Relaciones anidadas (bloque, tipo)
+    - Relaciones anidadas opcionales (bloque, tipo)
     """
     id: int = Field(..., description="Identificador único del espacio")
-    bloque: Optional[BloqueResumenEspacio]
-    tipo_espacio: Optional[TipoEspacioResumen]
+    bloque: Optional[BloqueResumenEspacio] = Field(None, description="Información del bloque relacionado")
+    tipo_espacio: Optional[TipoEspacioResumen] = Field(None, description="Información del tipo de espacio")
 
     model_config = ConfigDict(from_attributes=True)
 

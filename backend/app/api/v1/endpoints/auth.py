@@ -180,15 +180,15 @@ def login_para_obtener_token_acceso(
         )
 
     # ========================================================================
-    # 6. GENERAR JWT CON PAYLOAD: sub (email) y rol
+    # 6. GENERAR JWT CON PAYLOAD: sub (correo_institucional) y rol
     # ========================================================================
 
     # Preparar datos para incluir en el JWT
-    # - sub: email del usuario (identificador único)
-    # - rol: tipo_rol.value (valor del enum, ej: "Administrador", "Técnico")
+    # - sub: correo_institucional del usuario (identificador único)
+    # - rol: tipo_rol.value (valor del enum, ej: "Jefe de Infraestructura", "Tecnico")
     payload_jwt = {
-        "sub": usuario.correo,                    # Email como identificador
-        "rol": usuario.tipo_rol.value,            # Rol del usuario
+        "sub": usuario.correo_institucional,           # Correo institucional como identificador
+        "rol": usuario.tipo_rol,                        # Rol del usuario
     }
 
     # Crear token JWT con función de seguridad

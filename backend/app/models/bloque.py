@@ -4,6 +4,7 @@ Representa los edificios físicos de la UCC Montería.
 """
 
 from sqlalchemy import Column, Integer, String, UniqueConstraint
+from sqlalchemy.orm import relationship
 from app.db.base_class import Base
 
 
@@ -16,6 +17,9 @@ class Bloque(Base):
         id (int): Identificador único del bloque (clave primaria).
         codigo_bloque (str): Código único del edificio (ej: 'B1', 'B_ADM').
         nombre_bloque (str): Nombre descriptivo del edificio (ej: 'Bloque 1', 'Bloque Administrativo').
+
+    Relaciones:
+        espacios: Uno a muchos - Un bloque contiene múltiples espacios
     """
 
     __tablename__ = "bloques"
@@ -23,6 +27,9 @@ class Bloque(Base):
     id: int = Column(Integer, primary_key=True, index=True)
     codigo_bloque: str = Column(String(15), nullable=False, unique=True, index=True)
     nombre_bloque: str = Column(String(65), nullable=False, unique=True, index=True)
+
+    # Relaciones
+    espacios = relationship("Espacio", back_populates="bloque")
 
     # Restricciones
     __table_args__ = (

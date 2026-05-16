@@ -5,17 +5,23 @@ Gestión del personal técnico y administrativo que interactúa con el sistema.
 
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, func, UniqueConstraint
 from app.db.base_class import Base
 
 
 class TipoRol(str, Enum):
-    """Roles disponibles en el sistema."""
-    TECNICO_INTERNO = "Tecnico interno"
-    SUPERVISOR = "Supervisor"
-    ADMINISTRADOR = "Administrador"
-    CONTRATISTA = "Contratista"
-    SOLO_LECTURA = "Solo lectura"
+    """
+    Roles disponibles en el sistema.
+
+    Solo 3 roles permitidos:
+    - Jefe de Infraestructura: Máximos privilegios (Admin)
+    - Auxiliar de Infraestructura: Privilegios limitados
+    - Tecnico: Técnico operativo
+    """
+    JEFE_INFRAESTRUCTURA = "Jefe de Infraestructura"
+    AUXILIAR_INFRAESTRUCTURA = "Auxiliar de Infraestructura"
+    TECNICO = "Tecnico"
 
 
 class Usuario(Base):
@@ -25,10 +31,10 @@ class Usuario(Base):
 
     Atributos:
         id (int): Identificador único del usuario (clave primaria).
-        codigo_universitario (int): ID institucional para cruce con RRHH (único).
+        codigo_universitario (int): ID institucional para cruce con RRHH (único, nullable para técnicos).
         nombre (str): Primer nombre del usuario.
         apellido (str): Apellido del usuario.
-        tipo_rol (str): Rol asignado ('Tecnico interno', 'Supervisor', 'Administrador', 'Contratista', 'Solo lectura').
+        tipo_rol (str): Rol asignado ('Jefe de Infraestructura', 'Auxiliar de Infraestructura', 'Tecnico').
         telefono (str): Número de teléfono del usuario.
         correo_institucional (str): Correo institucional para notificaciones y alertas.
         hashed_password (str): Contraseña hasheada con bcrypt para autenticación.
@@ -41,12 +47,12 @@ class Usuario(Base):
 
     # Columnas
     id: int = Column(Integer, primary_key=True, index=True)
-    codigo_universitario: int = Column(Integer, nullable=False, unique=True, index=True)
+    codigo_universitario: Optional[int] = Column(Integer, nullable=True, unique=True, index=True)
     nombre: str = Column(String(30), nullable=False, index=True)
     apellido: str = Column(String(30), nullable=False, index=True)
     tipo_rol: str = Column(String(50), nullable=False)
     telefono: str = Column(String(12), nullable=False)
-    correo_institucional: str = Column(String(50), nullable=True, index=True)
+    correo_institucional: str = Column(String(50), nullable=True, unique=True, index=True)
     hashed_password: str = Column(String(255), nullable=False)
     activo: bool = Column(Boolean, default=True, nullable=False, index=True)
     created_at: datetime = Column(DateTime, server_default=func.now(), nullable=False)
@@ -55,6 +61,7 @@ class Usuario(Base):
     # Restricciones
     __table_args__ = (
         UniqueConstraint('codigo_universitario', name='uq_encargado_codigo'),
+        UniqueConstraint('correo_institucional', name='uq_encargado_correo'),
         {"schema": "gestion_aires_ucc"}
     )
 

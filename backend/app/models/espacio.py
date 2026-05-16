@@ -20,6 +20,10 @@ class Espacio(Base):
         piso (int): Número de piso - ayuda a visualizar la distribución vertical en mapas o dashboards.
         bloque_id (int): FK a la tabla bloques.
         tipo_espacio_id (int): FK a la tabla tipos_espacios.
+
+    Relaciones:
+        bloque: Muchos a uno - Un espacio pertenece a un bloque
+        equipos: Uno a muchos - Un espacio contiene múltiples equipos
     """
 
     __tablename__ = "espacios"
@@ -33,8 +37,10 @@ class Espacio(Base):
     bloque_id: int = Column(Integer, ForeignKey("gestion_aires_ucc.bloques.id"), nullable=False, index=True)
     tipo_espacio_id: int = Column(Integer, ForeignKey("gestion_aires_ucc.tipos_espacios.id"), nullable=False, index=True)
 
-    # Relación inversa: Un espacio puede tener muchos equipos
-    equipos = relationship("Equipo", back_populates="espacio")
+    # Relaciones
+    bloque = relationship("Bloque", back_populates="espacios")
+    tipo_espacio = relationship("TipoEspacio", foreign_keys=[tipo_espacio_id])
+    equipos = relationship("Equipo", back_populates="espacio", overlaps="equipos_espacio")
 
     # Esquema de base de datos
     __table_args__ = {"schema": "gestion_aires_ucc"}

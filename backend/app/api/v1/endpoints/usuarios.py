@@ -19,7 +19,6 @@ Seguridad:
 - Type hints en todas las dependencias
 """
 
-from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path, Body
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -72,21 +71,25 @@ def crear_usuario(
     Crear un nuevo usuario en el sistema.
 
     **Flujo de Validación:**
-    1. Pydantic valida: email (EmailStr), password (min 8 chars), nombre (1-100 chars)
-    2. El servicio hashea la contraseña con bcrypt
-    3. Se intenta persistir en BD con restricción UNIQUE en correo
-    4. Si hay email duplicado, la BD lanza IntegrityError → HTTP 409
+    1. Pydantic valida: correo_institucional (EmailStr), password (min 8 chars), nombre (1-30 chars)
+    2. Validación explícita: verificar que correo_institucional no existe
+    3. El servicio hashea la contraseña con bcrypt
+    4. Se intenta persistir en BD con restricción UNIQUE en correo_institucional
+    5. Si hay email duplicado, la BD lanza IntegrityError → HTTP 409
 
     **Campos Requeridos:**
-    - nombre: Nombre completo (1-100 caracteres)
-    - correo: Email institucional válido y único
+    - nombre: Nombre (1-30 caracteres)
+    - apellido: Apellido (1-30 caracteres)
+    - correo_institucional: Email institucional válido y único (NO correo simple)
+    - telefono: Teléfono (7-12 caracteres)
+    - codigo_universitario: Código inst. (opcional)
     - password: Contraseña en texto plano (8-255 caracteres)
-    - tipo_rol: Rol del usuario (Administrador, Técnico, Supervisor, Contratista)
+    - tipo_rol: Rol del usuario (Jefe de Infraestructura, Auxiliar de Infraestructura, Tecnico)
     - activo: Estado del usuario (default: true)
 
     **Respuesta (UsuarioResponse):**
     - NUNCA incluye hashed_password por seguridad
-    - Incluye: id, nombre, correo, tipo_rol, activo, created_at, updated_at
+    - Incluye: id, nombre, apellido, correo_institucional, telefono, tipo_rol, activo, created_at, updated_at
 
     **Códigos HTTP:**
     - 201: Usuario creado exitosamente
@@ -118,19 +121,30 @@ def crear_usuario(
     ```
     """
     try:
+        # VALIDACIÓN EXPLÍCITA: Verificar que el correo institucional no esté duplicado
+        usuario_existente = usuario_service.obtener_usuario_por_email(db, usuario_in.correo_institucional)
+        if usuario_existente:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"El correo institucional '{usuario_in.correo_institucional}' ya está registrado en el sistema"
+            )
+
         # Llamar servicio para crear usuario
         db_usuario = usuario_service.crear_usuario(db, usuario_in)
         return db_usuario
 
+    except HTTPException:
+        # Re-lanzar excepciones HTTP
+        raise
     except IntegrityError as e:
-        # Capturar violación de restricción UNIQUE en email
+        # Capturar violación de restricción UNIQUE en correo_institucional
         db.rollback()
 
         # Verificar si el error es por email duplicado
-        if "uq_usuario_correo" in str(e.orig) or "unique constraint" in str(e.orig).lower():
+        if "uq_usuario_correo" in str(e.orig) or "uq_encargado_correo" in str(e.orig) or "unique constraint" in str(e.orig).lower():
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"El email '{usuario_in.correo}' ya está registrado en el sistema",
+                detail=f"El correo institucional '{usuario_in.correo_institucional}' ya está registrado en el sistema",
             )
 
         # Para otros errores de integridad, retornar 400
@@ -325,6 +339,8 @@ def actualizar_usuario(
     **Cuerpo de Solicitud (UsuarioUpdate):**
     - Todos los campos son opcionales (permite sparse updates)
     - nombre: Nuevo nombre (opcional)
+    - apellido: Nuevo apellido (opcional)
+    - telefono: Nuevo teléfono (opcional)
     - tipo_rol: Nuevo rol (opcional)
     - activo: Nuevo estado (opcional, true/false)
     - NOTA: No incluye password (usar endpoint separado si es necesario)
@@ -386,7 +402,7 @@ def actualizar_usuario(
 
         return db_usuario_actualizado
 
-    except IntegrityError as e:
+    except IntegrityError:
         # Capturar violación de restricciones de integridad
         db.rollback()
 
@@ -396,6 +412,121 @@ def actualizar_usuario(
         )
 
 
+@router.delete(
+    "/{usuario_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Eliminar un usuario por ID",
+    responses={
+        200: {"description": "Usuario eliminado exitosamente"},
+        404: {"description": "Usuario no existe"},
+        400: {"description": "No se puede eliminar: usuario tiene mantenimientos asociados"},
+    },
+)
+def eliminar_usuario(
+    usuario_id: int = Path(
+        ...,
+        gt=0,
+        description="ID único del usuario a eliminar",
+    ),
+    db: Session = Depends(get_db),
+) -> dict:
+    """
+    Eliminar un usuario completamente de la base de datos.
 
+    **Parámetro de Ruta:**
+    - usuario_id: ID del usuario a eliminar (debe ser > 0)
 
+    **Validaciones Previas:**
+    1. Verificar que el usuario existe (404 si no existe)
+    2. Verificar que no tiene mantenimientos asignados (400 si tiene)
+       - Si intenta borrar un usuario con mantenimientos, PostgreSQL rechazará por constraint
+       - En ese caso, sugerir desactivar el usuario usando PUT en lugar de eliminar
 
+    **Flujo de Eliminación:**
+    1. Buscar usuario por ID
+    2. Si no existe → HTTPException 404
+    3. Intentar eliminar (dentro de try/except)
+    4. Si hay IntegrityError (relación con mantenimientos) → HTTPException 400 con mensaje
+    5. Si es exitoso → db.commit() y retornar mensaje 200 OK
+
+    **Código HTTP:**
+    - 200: Usuario eliminado exitosamente
+    - 404: Usuario no existe
+    - 400: No se puede eliminar por restricción de integridad referencial
+
+    **Ejemplo de Solicitud:**
+    ```
+    DELETE /usuarios/5
+    ```
+
+    **Ejemplo de Respuesta (200):**
+    ```json
+    {
+        "detail": "El usuario con ID 5 ha sido eliminado exitosamente del sistema"
+    }
+    ```
+
+    **Ejemplo de Respuesta (400):**
+    ```json
+    {
+        "detail": "No se puede eliminar el usuario porque tiene mantenimientos asociados. Considere desactivarlo usando el PUT."
+    }
+    ```
+
+    **Ejemplo de Respuesta (404):**
+    ```json
+    {
+        "detail": "Usuario con ID 999 no encontrado"
+    }
+    ```
+
+    **Nota de Seguridad:**
+    - Esta es una eliminación FÍSICA (permanente)
+    - Para un soft delete (marcar como inactivo), use PUT con "activo": false
+    """
+    try:
+        # 1. Validar que el usuario existe
+        db_usuario = usuario_service.obtener_usuario_por_id(db, usuario_id)
+
+        if not db_usuario:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Usuario con ID {usuario_id} no encontrado",
+            )
+
+        # 2. Intentar eliminar el usuario
+        try:
+            db.delete(db_usuario)
+            db.commit()
+
+            return {
+                "detail": f"El usuario con ID {usuario_id} ha sido eliminado exitosamente del sistema"
+            }
+
+        except IntegrityError as e:
+            # Capturar error de restricción de clave foránea (relaciones con mantenimientos)
+            db.rollback()
+
+            # Verificar si es por restricción de mantenimientos
+            if "mantenimientos" in str(e.orig).lower() or "fk_" in str(e.orig).lower():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No se puede eliminar el usuario porque tiene mantenimientos asociados. Considere desactivarlo usando el PUT.",
+                )
+
+            # Para otros errores de integridad, retornar error genérico
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Violación de restricción de integridad: el usuario no puede ser eliminado debido a registros relacionados en la base de datos",
+            )
+
+    except HTTPException:
+        # Re-lanzar excepciones HTTP
+        raise
+    except Exception as e:
+        # Capturar cualquier excepción inesperada
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno del servidor al intentar eliminar el usuario: {str(e)}",
+        )

@@ -1,10 +1,13 @@
 """
-Modelo para Historial de Mantenimientos.
-Bitácora inmutable de lo que ya sucedió. Fundamental para auditorías de calidad.
+Modelo para la tabla de Mantenimientos.
+Registros de servicios técnicos y reparaciones en los aires acondicionados.
+Incluye información financiera y de auditoría.
 """
 
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Text, func
+from datetime import datetime, date
+from typing import Optional
+from decimal import Decimal
+from sqlalchemy import Column, Integer, String, Date, ForeignKey, DateTime, func, Numeric, Text
 from sqlalchemy.orm import relationship
 from app.db.base_class import Base
 
@@ -12,37 +15,42 @@ from app.db.base_class import Base
 class Mantenimiento(Base):
     """
     Modelo SQLAlchemy para la tabla 'mantenimientos'.
-    Registro histórico de trabajos de mantenimiento realizados.
+    Registra cada intervención técnica realizada en un equipo de aire acondicionado.
 
     Atributos:
-        id (int): Identificador único (clave primaria).
-        fecha_mantenimiento (date): Fecha real de ejecución del mantenimiento.
-        detalle_mantenimiento (str): Descripción del trabajo realizado.
-        created_at (datetime): Timestamp de creación del registro.
-        equipo_id (int): FK a equipos - aire que fue mantenido.
-        encargado_id (int): FK a encargados - técnico que realizó el trabajo.
-        tipo_mantenimiento_id (int): FK a tipos_mantenimiento - tipo de trabajo.
-        registrado_por (int): FK a encargados - quién digitó el dato en el sistema.
+        id (int): Identificador único del registro de mantenimiento.
+        fecha_mantenimiento (date): Fecha en que se realizó el servicio de campo.
+        detalle_mantenimiento (str): Descripción técnica de lo hallado y trabajos realizados.
+        costo_servicio (Decimal): Valor económico del servicio técnico (CAMPO FINANCIERO).
+        equipo_id (int): FK a la tabla de equipos (aire acondicionado intervenido).
+        encargado_id (int): FK a tabla de usuarios (técnico que realizó el servicio).
+        tipo_mantenimiento_id (int): FK a tabla de tipos_mantenimiento (Preventivo/Correctivo).
+        registrado_por (int): FK a tabla de usuarios (quien registra en el sistema).
+        created_at (datetime): Timestamp automático de creación del registro.
     """
 
     __tablename__ = "mantenimientos"
+    __table_args__ = {"schema": "gestion_aires_ucc"}
 
+    # Columnas principales
     id: int = Column(Integer, primary_key=True, index=True)
-    fecha_mantenimiento: datetime = Column(Date, nullable=False, index=True)
-    detalle_mantenimiento: str = Column(Text, nullable=True)
-    created_at: datetime = Column(DateTime, server_default=func.now(), nullable=False)
+    fecha_mantenimiento: date = Column(Date, nullable=False, index=True)
+    detalle_mantenimiento: Optional[str] = Column(Text, nullable=True)
+
+    # --- CAMPO FINANCIERO ---
+    costo_servicio: Decimal = Column(Numeric(12, 2), default=Decimal('0.00'), nullable=False)
 
     # Claves foráneas
     equipo_id: int = Column(Integer, ForeignKey("gestion_aires_ucc.equipos.id"), nullable=False, index=True)
     encargado_id: int = Column(Integer, ForeignKey("gestion_aires_ucc.encargados.id"), nullable=False, index=True)
-    tipo_mantenimiento_id: int = Column(Integer, ForeignKey("gestion_aires_ucc.tipos_mantenimiento.id"), nullable=False, index=True)
+    tipo_mantenimiento_id = Column(Integer, ForeignKey("gestion_aires_ucc.tipos_mantenimiento.id"), nullable=False)
     registrado_por: int = Column(Integer, ForeignKey("gestion_aires_ucc.encargados.id"), nullable=False, index=True)
 
-    # Relaciones
-    equipo = relationship("Equipo", backref="mantenimientos")
-    tecnico = relationship("Usuario", foreign_keys=[encargado_id], backref="mantenimientos_realizados")
-    tipo_mantenimiento = relationship("TipoMantenimiento", backref="mantenimientos")
+    # Timestamps de auditoría
+    created_at: datetime = Column(DateTime, server_default=func.now(), nullable=False)
+
+    # Relaciones de navegación
+    equipo = relationship("Equipo", backref="mantenimientos", foreign_keys=[equipo_id])
+    encargado = relationship("Usuario", foreign_keys=[encargado_id], backref="mantenimientos_realizados")
     registrador = relationship("Usuario", foreign_keys=[registrado_por], backref="mantenimientos_registrados")
-
-    __table_args__ = {"schema": "gestion_aires_ucc"}
-
+    tipo = relationship("TipoMantenimiento", backref="mantenimientos_tipo")

@@ -16,7 +16,6 @@ Arquitectura:
 
 from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict
-from datetime import datetime
 
 
 # ============================================================================
@@ -31,16 +30,11 @@ class BloqueBase(BaseModel):
         max_length=20,
         description="Código único del bloque (ej: 'BLOQUE-A', 'BLOQUE-1')"
     )
-    nombre: str = Field(
+    nombre_bloque: str = Field(
         ...,
         min_length=1,
         max_length=100,
         description="Nombre descriptivo del bloque (ej: 'Bloque Academia', 'Bloque Administrativo')"
-    )
-    descripcion: Optional[str] = Field(
-        None,
-        max_length=500,
-        description="Descripción general del bloque y su ubicación"
     )
 
 
@@ -51,7 +45,6 @@ class BloqueCreate(BloqueBase):
     Validación Pydantic:
     - Código único a nivel global
     - Nombre descriptivo y único
-    - Descripción opcional para documentación
     """
     pass
 
@@ -62,18 +55,13 @@ class BloqueUpdate(BaseModel):
 
     IMPORTANTE:
     - NO se puede cambiar codigo_bloque (auditoría)
-    - Solo se puede cambiar: nombre, descripción
+    - Solo se puede cambiar: nombre_bloque
     """
-    nombre: Optional[str] = Field(
+    nombre_bloque: Optional[str] = Field(
         None,
         min_length=1,
         max_length=100,
         description="Actualizar nombre del bloque"
-    )
-    descripcion: Optional[str] = Field(
-        None,
-        max_length=500,
-        description="Actualizar descripción del bloque"
     )
 
     model_config = ConfigDict(extra="forbid")
@@ -90,10 +78,9 @@ class BloqueResponse(BloqueBase):
     Auditoría:
     - ID único para rastreabilidad
     - Código espacial para referencias físicas
-    - Nombre y descripción completa
+    - Nombre descriptivo
     """
     id: int = Field(..., description="Identificador único del bloque")
-    codigo_bloque: str
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -132,31 +119,4 @@ class BloqueResumenAnalytica(BaseModel):
     btu_total: int
 
 
-"""
-NOTAS DE IMPLEMENTACIÓN:
-
-1. ORGANIZACIÓN FÍSICA:
-   Campus Montería
-   ├── Bloque A (Academia)
-   │   ├── Espacio A-101 (Aula)
-   │   ├── Espacio A-102 (Laboratorio)
-   │   └── Espacio A-201 (Oficina)
-   ├── Bloque B (Administrativo)
-   ├── Bloque C (Biblioteca)
-   └── ...
-
-2. BÚSQUEDAS COMUNES:
-   - GET /bloques                  → Todos los bloques
-   - GET /bloques/{id}             → Detalles de un bloque
-   - GET /bloques/{id}/estadisticas → KPIs por bloque
-
-3. DASHBOARDS:
-   - Mapa de bloques con indicador de salud
-   - Resumen de disponibilidad por bloque
-   - Alertas críticas agrupadas por bloque
-
-4. PAGINACIÓN RECOMENDADA:
-   - limit=20 (cantidad de bloques típicamente pequeña)
-   - Todos los bloques podrían caber en una sola página
-"""
 
