@@ -9,6 +9,33 @@ from pydantic import BaseModel, Field, ConfigDict
 from decimal import Decimal
 
 
+# Esquemas anidados para relaciones
+class MarcaResumenEquipo(BaseModel):
+    """Información resumida de marca para respuesta de equipo."""
+    id: int
+    nombre: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EspacioResumenEquipo(BaseModel):
+    """Información resumida de espacio para respuesta de equipo."""
+    id: int
+    codigo_espacio: str
+    nombre: str
+    piso: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TipoEquipoResumen(BaseModel):
+    """Información resumida de tipo de equipo."""
+    id: int
+    nombre: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class EquipoBase(BaseModel):
     """
     Base schema para Equipo. Define los atributos técnicos comunes.
@@ -46,7 +73,7 @@ class EquipoBase(BaseModel):
 
 
 class EquipoCreate(EquipoBase):
-    """Schema para la creación de un nuevo registro de equipo."""
+    """Schema para la creación de un nuevo registro of equipo."""
     pass
 
 
@@ -69,8 +96,12 @@ class EquipoResponse(EquipoBase):
     """
     Schema de respuesta que incluye el ID generado por la base de datos.
     Se utiliza para enviar datos desde el FastAPI hacia el Frontend.
+    Incluye información de relaciones anidadas (marca, espacio, tipo).
     """
     id: int = Field(..., description="ID único incremental del equipo")
+    marca: Optional[MarcaResumenEquipo] = Field(None, description="Información de la marca")
+    espacio: Optional[EspacioResumenEquipo] = Field(None, description="Información del espacio")
+    tipo: Optional[TipoEquipoResumen] = Field(None, description="Información del tipo de equipo")
 
     model_config = ConfigDict(from_attributes=True)
 

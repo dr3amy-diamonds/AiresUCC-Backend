@@ -11,7 +11,7 @@ from app.models.bloque import Bloque
 from app.models.tipo_espacio import TipoEspacio
 from app.models.tipo_equipo import TipoEquipo
 from app.models.tipo_mantenimiento import TipoMantenimiento
-from app.models.componente import TipoComponente
+from app.models.tipo_componente import TipoComponente
 from app.models.mantenimiento import Mantenimiento
 from app.models.componente_usado import ComponenteUsado
 from app.models.programacion import Programacion

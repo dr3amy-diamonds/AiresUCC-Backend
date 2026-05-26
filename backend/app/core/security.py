@@ -4,11 +4,13 @@ Implementa funciones para hashear contraseñas y gestionar tokens JWT.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, List
 import os
 import bcrypt
 from jose import JWTError, jwt
 from dotenv import load_dotenv
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 # Cargar variables de entorno
 load_dotenv()
@@ -135,3 +137,58 @@ def verificar_token(token: str) -> Optional[dict]:
     except JWTError:
         # Token inválido, expirado o no se pudo decodificar
         return None
+
+
+def require_role(*allowed_roles: str):
+    """
+    Dependencia para verificar que el usuario autenticado tiene un rol permitido.
+    
+    Args:
+        *allowed_roles: Roles permitidos (ej: "Tecnico", "Jefe de Infraestructura")
+    
+    Returns:
+        Función dependencia que valida el rol del JWT
+    
+    Ejemplo de uso:
+        @router.get("/", dependencies=[Depends(require_role("Tecnico", "Jefe de Infraestructura"))])
+        def endpoint(db: Session = Depends(get_db)):
+            ...
+    """
+    async def check_role(credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+        """
+        Valida que el token JWT contiene un rol permitido.
+        """
+        token = credentials.credentials
+
+        # Verificar y decodificar el token
+        datos_token = verificar_token(token)
+
+        if not datos_token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token inválido o expirado",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Extraer rol del token
+        rol_usuario = datos_token.get("rol")
+
+        if not rol_usuario:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token no contiene información de rol",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Validar que el rol está en la lista de roles permitidos
+        if rol_usuario not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Acceso denegado. Rol '{rol_usuario}' no tiene permisos para este recurso. Roles permitidos: {', '.join(allowed_roles)}"
+            )
+
+        # Retornar datos del token para uso posterior si es necesario
+        return datos_token
+
+    return check_role
+

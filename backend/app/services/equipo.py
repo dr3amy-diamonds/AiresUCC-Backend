@@ -4,7 +4,7 @@ Lógica de negocio para equipos de aire acondicionado en AuraData Analytics.
 """
 
 from typing import Optional, List
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
 
@@ -13,21 +13,41 @@ from app.models.equipo import Equipo
 from app.schemas.equipo import EquipoCreate, EquipoUpdate, EquipoResponse
 
 def obtener_equipo_por_id(db: Session, equipo_id: int) -> Optional[Equipo]:
-    return db.query(Equipo).filter(Equipo.id == equipo_id).first()
+    return db.query(Equipo).options(
+        joinedload(Equipo.marca),
+        joinedload(Equipo.espacio),
+        joinedload(Equipo.tipo)
+    ).filter(Equipo.id == equipo_id).first()
 
 def obtener_equipo_por_codigo(db: Session, codigo_activo: str) -> Optional[Equipo]:
-    return db.query(Equipo).filter(Equipo.codigo_activo == codigo_activo).first()
+    return db.query(Equipo).options(
+        joinedload(Equipo.marca),
+        joinedload(Equipo.espacio),
+        joinedload(Equipo.tipo)
+    ).filter(Equipo.codigo_activo == codigo_activo).first()
 
 def obtener_equipos(db: Session, skip: int = 0, limit: int = 10) -> tuple[List[Equipo], int]:
     total = db.query(func.count(Equipo.id)).scalar() or 0
-    equipos = db.query(Equipo).offset(skip).limit(limit).all()
+    equipos = db.query(Equipo).options(
+        joinedload(Equipo.marca),
+        joinedload(Equipo.espacio),
+        joinedload(Equipo.tipo)
+    ).offset(skip).limit(limit).all()
     return equipos, total
 
 def obtener_equipos_por_espacio(db: Session, espacio_id: int) -> List[Equipo]:
-    return db.query(Equipo).filter(Equipo.espacio_id == espacio_id).all()
+    return db.query(Equipo).options(
+        joinedload(Equipo.marca),
+        joinedload(Equipo.espacio),
+        joinedload(Equipo.tipo)
+    ).filter(Equipo.espacio_id == espacio_id).all()
 
 def obtener_equipos_por_estado(db: Session, estado: str) -> List[Equipo]:
-    return db.query(Equipo).filter(Equipo.estado == estado).all()
+    return db.query(Equipo).options(
+        joinedload(Equipo.marca),
+        joinedload(Equipo.espacio),
+        joinedload(Equipo.tipo)
+    ).filter(Equipo.estado == estado).all()
 
 def crear_equipo(db: Session, equipo_in: EquipoCreate) -> Equipo:
     """

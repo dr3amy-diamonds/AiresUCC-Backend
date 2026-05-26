@@ -34,8 +34,8 @@ class ComponenteUsado(Base):
     repuesto_utilizado_id: int = Column(Integer, ForeignKey("gestion_aires_ucc.tipos_componentes.id"), nullable=False, index=True)
 
     # Relaciones
-    mantenimiento = relationship("Mantenimiento", backref="componentes_usados")
-    componente = relationship("TipoComponente", backref="usos")
+    mantenimiento = relationship("Mantenimiento", foreign_keys=[mantenimiento_realizado_id], backref="componentes_usados")
+    componente = relationship("TipoComponente", foreign_keys=[repuesto_utilizado_id], backref="usos")
 
     __table_args__ = {"schema": "gestion_aires_ucc"}
 

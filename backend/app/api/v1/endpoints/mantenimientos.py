@@ -14,6 +14,7 @@ from app.schemas.mantenimiento import (
     MantenimientoEstadisticas
 )
 from app.services import mantenimiento as mantenimiento_service
+from app.core.security import require_role
 
 router = APIRouter(prefix="/mantenimientos", tags=["mantenimientos"])
 
@@ -38,7 +39,7 @@ def crear_mantenimiento(
             detail=f"Error al registrar el mantenimiento: {str(e)}"
         )
 
-@router.get("/", response_model=List[MantenimientoResponse])
+@router.get("/", response_model=List[MantenimientoResponse], dependencies=[Depends(require_role("Jefe de Infraestructura", "Auxiliar de Infraestructura", "Tecnico"))])
 def listar_mantenimientos(
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=100),
@@ -48,14 +49,25 @@ def listar_mantenimientos(
     """
     Consulta el historial de mantenimientos.
     Permite filtrar por un equipo específico para ver su hoja de vida técnica.
+
+    **Roles Permitidos:** Jefe de Infraestructura, Auxiliar de Infraestructura, Tecnico
+
+    **Parámetros:**
+    - skip: Número de registros a saltar (default: 0)
+    - limit: Máximo de registros a retornar (default: 10, máximo: 100)
+    - equipo_id: Filtrar historial de un equipo específico (opcional)
     """
     return mantenimiento_service.obtener_mantenimientos(
         db, skip=skip, limit=limit, equipo_id=equipo_id
     )
 
-@router.get("/{mantenimiento_id}", response_model=MantenimientoResponse)
+@router.get("/{mantenimiento_id}", response_model=MantenimientoResponse, dependencies=[Depends(require_role("Jefe de Infraestructura", "Auxiliar de Infraestructura", "Tecnico"))])
 def leer_mantenimiento(mantenimiento_id: int, db: Session = Depends(get_db)):
-    """Obtiene los detalles de una intervención específica."""
+    """
+    Obtiene los detalles de una intervención específica.
+
+    **Roles Permitidos:** Jefe de Infraestructura, Auxiliar de Infraestructura, Tecnico
+    """
     db_mantenimiento = mantenimiento_service.obtener_mantenimiento_por_id(db, mantenimiento_id)
     if not db_mantenimiento:
         raise HTTPException(status_code=404, detail="Registro de mantenimiento no encontrado")
