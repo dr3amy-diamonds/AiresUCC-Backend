@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import usuarios, auth, equipos, mantenimientos, programaciones, dashboard, espacios, bloques, marcas, tipo_componentes
+from app.api.v1.endpoints import usuarios, auth, equipos, mantenimientos, programaciones, dashboard, espacios, bloques, marcas, tipo_componentes, tipo_equipos
 
 api_router = APIRouter()
 
@@ -14,3 +14,4 @@ api_router.include_router(dashboard.router)
 api_router.include_router(espacios.router)
 api_router.include_router(marcas.router)
 api_router.include_router(tipo_componentes.router)
+api_router.include_router(tipo_equipos.router)

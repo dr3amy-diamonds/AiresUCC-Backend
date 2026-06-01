@@ -61,6 +61,8 @@ class EquipoBase(BaseModel):
     # --- NUEVOS CAMPOS MVP ---
     tonelaje: Optional[Decimal] = Field(None, max_digits=4, decimal_places=2, description="Capacidad en toneladas")
     numero_serie: Optional[str] = Field(None, max_length=60, description="Serial de fábrica")
+    voltaje: Optional[str] = Field(None, max_length=20, description="Voltaje de operación (ej: 220V)")
+    refrigerante: Optional[str] = Field(None, max_length=20, description="Tipo de gas refrigerante (ej: R410A)")
     ultima_fecha: Optional[date] = Field(None, description="Fecha del último mantenimiento")
     proxima_fecha: Optional[date] = Field(None, description="Fecha del próximo mantenimiento")
     # -------------------------
@@ -86,6 +88,8 @@ class EquipoUpdate(BaseModel):
     capacidad_btu: Optional[int] = None
     tonelaje: Optional[Decimal] = None
     numero_serie: Optional[str] = None
+    voltaje: Optional[str] = None
+    refrigerante: Optional[str] = None
     ultima_fecha: Optional[date] = None
     proxima_fecha: Optional[date] = None
     estado: Optional[str] = None

@@ -21,7 +21,7 @@ class Equipo(Base):
             modelo (str): Modelo del equipo o referencia técnica del fabricante (ej: 'HCH45P17C').
             capacidad_btu (int): Capacidad en BTU - dato técnico para estimar carga térmica.
             tonelaje (float): Capacidad de refrigeración expresada en toneladas (ej: 3.58).
-            numero_serie (str): Número de serie único grabado por el fabricante en la unidad.
+            numero_serie (str): Número de s erie único grabado por el fabricante en la unidad.
             fecha_instalacion (date): Fecha en la que el equipo fue montado en el campus.
             ultima_fecha (date): Fecha del último mantenimiento registrado satisfactoriamente.
             proxima_fecha (date): Fecha proyectada para la siguiente intervención preventiva.
@@ -49,6 +49,9 @@ class Equipo(Base):
     # --- NUEVAS COLUMNAS PARA EL MVP (Atributos Directos) ---
     numero_serie: str = Column(String(60), nullable=True, unique=True, index=True)
     tonelaje: float = Column(Numeric(4, 2), nullable=True)  # Ejemplo: 3.58
+    voltaje: str = Column(String(20), nullable=True)  # Ejemplo: 220V, 110V
+    refrigerante: str = Column(String(20), nullable=True)  # Ejemplo: R410A, R32, R407C
+    fecha_compra: Optional[date] = Column(Date, nullable=True)
     ultima_fecha: Optional[date] = Column(Date, nullable=True)
     proxima_fecha: Optional[date] = Column(Date, nullable=True)
 
