@@ -74,9 +74,14 @@ class EspacioUpdate(BaseModel):
 
     IMPORTANTE:
     - NO se puede cambiar bloque_id (violaría integridad física)
-    - NO se puede cambiar codigo_espacio (auditoría)
-    - Solo se puede cambiar: nombre, piso, tipo_espacio_id
+    - Se puede corregir: codigo_espacio, nombre, piso, tipo_espacio_id
     """
+    codigo_espacio: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=20,
+        description="Corregir código del espacio"
+    )
     nombre: Optional[str] = Field(
         None,
         min_length=1,

@@ -6,14 +6,15 @@ Actualizado para el MVP: Soporte completo para tonelaje, serial y fechas.
 
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import desc
 
 from app.db.session import get_db
 from app.models.equipo import Equipo
+from app.models.mantenimiento import Mantenimiento
 
-# NOTA: Cambié 'equipo_new' por 'equipo' para que coincida con la actualización
-# de los Schemas que realizamos en los pasos anteriores.
-from app.schemas.equipo import EquipoCreate, EquipoUpdate, EquipoResponse, EquipoListResponse
+from app.schemas.equipo import EquipoCreate, EquipoUpdate, EquipoResponse, EquipoListResponse, ActivarEquipoRequest
+from app.schemas.mantenimiento import MantenimientoHistorialEquipoResponse
 from app.services.equipo import (
     obtener_equipo_por_id,
     obtener_equipo_por_codigo,
@@ -42,6 +43,41 @@ def listar_equipos(
         "size": limit,
         "items": equipos
     }
+
+@router.get("/{equipo_id}/mantenimientos", response_model=List[MantenimientoHistorialEquipoResponse])
+def listar_mantenimientos_equipo(
+    equipo_id: int,
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db)
+):
+    """Historial de intervenciones técnicas de un equipo."""
+    equipo = obtener_equipo_por_id(db, equipo_id)
+    if not equipo:
+        raise HTTPException(status_code=404, detail="Equipo no encontrado")
+
+    mantenimientos = (
+        db.query(Mantenimiento)
+        .options(
+            joinedload(Mantenimiento.encargado),
+            joinedload(Mantenimiento.tipo),
+        )
+        .filter(Mantenimiento.equipo_id == equipo_id)
+        .order_by(desc(Mantenimiento.fecha_mantenimiento))
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        MantenimientoHistorialEquipoResponse(
+            id=m.id,
+            fecha_mantenimiento=m.fecha_mantenimiento,
+            detalle_mantenimiento=m.detalle_mantenimiento,
+            tipo_nombre=m.tipo.nombre if m.tipo else None,
+            tecnico_nombre=m.encargado.nombre if m.encargado else None,
+        )
+        for m in mantenimientos
+    ]
+
 
 @router.get("/{equipo_id}", response_model=EquipoResponse)
 def leer_equipo(equipo_id: int, db: Session = Depends(get_db)):
@@ -147,3 +183,27 @@ def eliminar_equipo_endpoint(equipo_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No se puede eliminar este equipo porque tiene un historial de mantenimientos asociado en AuraData."
         )
+
+@router.post("/activar", response_model=EquipoResponse, status_code=status.HTTP_200_OK)
+def activar_equipo_endpoint(request: ActivarEquipoRequest, db: Session = Depends(get_db)):
+    """Activa un equipo cambiando su estado a 'Operativo' usando su código de activo."""
+    try:
+        # Convertir el código a string para buscar en la BD (ya que el modelo lo define como String)
+        codigo_str = str(request.codigo_activo)
+        equipo = obtener_equipo_por_codigo(db, codigo_str)
+        
+        if not equipo:
+            raise HTTPException(status_code=404, detail="Equipo no encontrado con ese código de activo")
+        
+        # Actualizar el estado
+        equipo.estado = "Operativo"
+        db.commit()
+        db.refresh(equipo)
+        
+        return EquipoResponse.model_validate(equipo)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al activar el equipo: {str(e)}")

@@ -181,6 +181,17 @@ class MantenimientoResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MantenimientoHistorialEquipoResponse(BaseModel):
+    """Resumen de mantenimiento para el historial en la hoja de vida del equipo."""
+    id: int
+    fecha_mantenimiento: date
+    detalle_mantenimiento: Optional[str] = None
+    tipo_nombre: Optional[str] = Field(None, description="Nombre del tipo (Preventivo, Correctivo, etc.)")
+    tecnico_nombre: Optional[str] = Field(None, description="Nombre del técnico encargado")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class MantenimientoListResponse(BaseModel):
     """
     Respuesta paginada de mantenimientos.

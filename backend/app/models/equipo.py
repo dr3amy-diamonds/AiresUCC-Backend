@@ -49,7 +49,7 @@ class Equipo(Base):
     # --- NUEVAS COLUMNAS PARA EL MVP (Atributos Directos) ---
     numero_serie: str = Column(String(60), nullable=True, unique=True, index=True)
     tonelaje: float = Column(Numeric(4, 2), nullable=True)  # Ejemplo: 3.58
-    voltaje: str = Column(String(20), nullable=True)  # Ejemplo: 220V, 110V
+    voltaje: Optional[int] = Column(Integer, nullable=True)  # Ejemplo: 220, 110
     refrigerante: str = Column(String(20), nullable=True)  # Ejemplo: R410A, R32, R407C
     fecha_compra: Optional[date] = Column(Date, nullable=True)
     ultima_fecha: Optional[date] = Column(Date, nullable=True)

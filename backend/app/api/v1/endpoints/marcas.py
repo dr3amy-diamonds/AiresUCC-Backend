@@ -17,6 +17,7 @@ from sqlalchemy import func
 
 from app.db.session import get_db
 from app.models.marca import Marca
+from app.models.equipo import Equipo
 from app.schemas.marca import (
     MarcaCreate,
     MarcaUpdate,
@@ -295,16 +296,18 @@ def eliminar_marca(
             detail=f"La marca con ID {marca_id} no existe"
         )
 
+    equipos_vinculados = db.query(Equipo).filter(Equipo.marca_id == marca_id).count()
+    if equipos_vinculados > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se puede eliminar la marca porque tiene equipos asignados. Reasígnalos primero."
+        )
+
     try:
         db.delete(marca)
         db.commit()
     except Exception as e:
         db.rollback()
-        if "foreign key" in str(e).lower():
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="No se puede eliminar la marca: existen equipos asociados"
-            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Error al eliminar marca: {str(e)}"

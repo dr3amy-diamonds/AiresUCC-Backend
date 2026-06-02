@@ -100,7 +100,7 @@ def actualizar_equipo(db: Session, db_obj: Equipo, obj_in: EquipoUpdate) -> Equi
             setattr(db_obj, campo, valor)
         db.commit()
         db.refresh(db_obj)
-        return db_obj
+        return obtener_equipo_por_id(db, db_obj.id) or db_obj
     except IntegrityError as e:
         db.rollback()
         raise IntegrityError(

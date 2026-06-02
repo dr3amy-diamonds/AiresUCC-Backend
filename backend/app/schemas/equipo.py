@@ -61,7 +61,7 @@ class EquipoBase(BaseModel):
     # --- NUEVOS CAMPOS MVP ---
     tonelaje: Optional[Decimal] = Field(None, max_digits=4, decimal_places=2, description="Capacidad en toneladas")
     numero_serie: Optional[str] = Field(None, max_length=60, description="Serial de fábrica")
-    voltaje: Optional[str] = Field(None, max_length=20, description="Voltaje de operación (ej: 220V)")
+    voltaje: Optional[int] = Field(None, gt=0, description="Voltaje de operación en voltios (ej: 220)")
     refrigerante: Optional[str] = Field(None, max_length=20, description="Tipo de gas refrigerante (ej: R410A)")
     ultima_fecha: Optional[date] = Field(None, description="Fecha del último mantenimiento")
     proxima_fecha: Optional[date] = Field(None, description="Fecha del próximo mantenimiento")
@@ -84,16 +84,20 @@ class EquipoUpdate(BaseModel):
     Schema para la actualización parcial de un equipo.
     Permite modificar solo los campos necesarios sin afectar el resto.
     """
+    codigo_activo: Optional[str] = Field(None, min_length=1, max_length=50)
     modelo: Optional[str] = None
     capacidad_btu: Optional[int] = None
     tonelaje: Optional[Decimal] = None
     numero_serie: Optional[str] = None
-    voltaje: Optional[str] = None
+    voltaje: Optional[int] = None
     refrigerante: Optional[str] = None
     ultima_fecha: Optional[date] = None
     proxima_fecha: Optional[date] = None
     estado: Optional[str] = None
-    espacio_id: Optional[int] = None
+    marca_id: Optional[int] = Field(None, gt=0)
+    tipo_equipo_id: Optional[int] = Field(None, gt=0)
+    espacio_id: Optional[int] = Field(None, gt=0)
+    fecha_instalacion: Optional[date] = None
 
 
 class EquipoResponse(EquipoBase):
@@ -119,3 +123,8 @@ class EquipoListResponse(BaseModel):
     page: int = Field(..., description="Número de página actual")
     size: int = Field(..., description="Cantidad de items por página")
     items: list[EquipoResponse] = Field(..., description="Lista de equipos")
+
+
+class ActivarEquipoRequest(BaseModel):
+    """Schema para la solicitud de activación de equipo por código de activo."""
+    codigo_activo: int = Field(..., description="Código de activo del equipo (como entero)")

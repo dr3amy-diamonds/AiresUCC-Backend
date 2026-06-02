@@ -17,6 +17,7 @@ from sqlalchemy import func
 from app.db.session import get_db
 from app.models.espacio import Espacio
 from app.models.bloque import Bloque
+from app.models.equipo import Equipo
 from app.schemas.espacio import (
     EspacioCreate,
     EspacioUpdate,
@@ -332,8 +333,19 @@ def actualizar_espacio(
         )
 
     try:
-        # Actualizar solo los campos permitidos
         datos_update = espacio_in.model_dump(exclude_unset=True)
+
+        if "codigo_espacio" in datos_update and datos_update["codigo_espacio"] != espacio.codigo_espacio:
+            codigo_duplicado = db.query(Espacio).filter(
+                Espacio.codigo_espacio == datos_update["codigo_espacio"],
+                Espacio.id != espacio_id
+            ).first()
+            if codigo_duplicado:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"El codigo_espacio '{datos_update['codigo_espacio']}' ya existe. Especifique un código único."
+                )
+
         for campo, valor in datos_update.items():
             setattr(espacio, campo, valor)
 
@@ -341,6 +353,8 @@ def actualizar_espacio(
         db.refresh(espacio)
         return espacio
 
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(
@@ -384,16 +398,18 @@ def eliminar_espacio(
             detail=f"El espacio con ID {espacio_id} no existe"
         )
 
+    equipos_vinculados = db.query(Equipo).filter(Equipo.espacio_id == espacio_id).count()
+    if equipos_vinculados > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se puede eliminar el espacio porque tiene equipos asignados. Reubícalos primero."
+        )
+
     try:
         db.delete(espacio)
         db.commit()
     except Exception as e:
         db.rollback()
-        if "foreign key" in str(e).lower():
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="No se puede eliminar el espacio: existen equipos asociados"
-            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Error al eliminar espacio: {str(e)}"
