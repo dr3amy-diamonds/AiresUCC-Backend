@@ -57,9 +57,10 @@ def listar_mantenimientos(
     - limit: Máximo de registros a retornar (default: 10, máximo: 100)
     - equipo_id: Filtrar historial de un equipo específico (opcional)
     """
-    return mantenimiento_service.obtener_mantenimientos(
+    mantenimientos, _total = mantenimiento_service.listar_mantenimientos(
         db, skip=skip, limit=limit, equipo_id=equipo_id
     )
+    return mantenimientos
 
 @router.get("/{mantenimiento_id}", response_model=MantenimientoResponse, dependencies=[Depends(require_role("Jefe de Infraestructura", "Auxiliar de Infraestructura", "Tecnico"))])
 def leer_mantenimiento(mantenimiento_id: int, db: Session = Depends(get_db)):
