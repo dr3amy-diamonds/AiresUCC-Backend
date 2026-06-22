@@ -33,6 +33,7 @@ from enum import Enum
 class EstadoProgramacionEnum(str, Enum):
     """Estados posibles de una programación de mantenimiento."""
     PENDIENTE = "Pendiente"
+    EN_PROGRESO = "En progreso"
     COMPLETADO = "Completado"
     CANCELADO = "Cancelado"
     VENCIDO = "Vencido"
@@ -162,6 +163,62 @@ class MantenimientoResumenProgramacion(BaseModel):
     id: int
     detalle_mantenimiento: Optional[str] = None
     fecha_mantenimiento: date
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MarcaResumenProgramacionRead(BaseModel):
+    """Marca del equipo incluida en la agenda del técnico."""
+    id: int
+    nombre: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BloqueResumenProgramacionRead(BaseModel):
+    """Bloque/edificio donde está ubicado el aire acondicionado."""
+    id: int
+    codigo_bloque: str
+    nombre_bloque: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EspacioResumenProgramacionRead(BaseModel):
+    """Ubicación física (aula/salón) del equipo programado."""
+    id: int
+    nombre: str
+    bloque: Optional[BloqueResumenProgramacionRead] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EquipoResumenProgramacionRead(BaseModel):
+    """Equipo con marca y ubicación para la vista del técnico."""
+    id: int
+    codigo_activo: str
+    modelo: Optional[str] = None
+    marca: Optional[MarcaResumenProgramacionRead] = None
+    espacio: Optional[EspacioResumenProgramacionRead] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProgramacionRead(BaseModel):
+    """
+    Respuesta de programaciones asignadas al técnico autenticado.
+
+    Incluye equipo (codigo_activo, marca, modelo) y ubicación
+    (nombre del aula y bloque) mediante eager loading en el endpoint.
+    """
+    id: int
+    fecha_programada: date
+    estado: str
+    equipo_id: int
+    encargado_id: int
+    tipo_mantenimiento_id: int
+    mantenimiento_id: Optional[int] = None
+    equipo: Optional[EquipoResumenProgramacionRead] = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -387,7 +387,7 @@ def calcular_kpis_financieros_y_mantenimiento(db: Session) -> Dict[str, Any]:
     """
     # 1. GASTO TOTAL: Suma de costo_mano_obra
     gasto_total = (
-        db.query(func.sum(Mantenimiento.costo_mano_obra))
+        db.query(func.sum(Mantenimiento.costo_servicio))
         .scalar() or 0
     )
     gasto_total = float(gasto_total) if gasto_total else 0.0

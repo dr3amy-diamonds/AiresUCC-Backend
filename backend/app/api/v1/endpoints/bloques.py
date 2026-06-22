@@ -17,6 +17,7 @@ from sqlalchemy import func
 
 from app.db.session import get_db
 from app.models.bloque import Bloque
+from app.models.espacio import Espacio
 from app.schemas.bloque import (
     BloqueCreate,
     BloqueUpdate,
@@ -333,16 +334,27 @@ def eliminar_bloque(
             detail=f"El bloque con ID {bloque_id} no existe"
         )
 
+    espacios_asociados = (
+        db.query(func.count(Espacio.id))
+        .filter(Espacio.bloque_id == bloque_id)
+        .scalar()
+        or 0
+    )
+    if espacios_asociados > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"No se puede eliminar el bloque '{bloque.nombre_bloque}' porque tiene "
+                f"{espacios_asociados} espacio(s) registrado(s). "
+                "Primero reubique o elimine esos espacios."
+            ),
+        )
+
     try:
         db.delete(bloque)
         db.commit()
     except Exception as e:
         db.rollback()
-        if "foreign key" in str(e).lower():
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="No se puede eliminar el bloque: existen espacios asociados"
-            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Error al eliminar bloque: {str(e)}"

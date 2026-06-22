@@ -36,6 +36,8 @@ from app.schemas.programacion import (
     ProgramacionUpdate,
     EstadoProgramacionEnum
 )
+from app.schemas.auditoria import EventoAuditoriaCreate, TipoEventoEnum
+from app.services.audit_event_processor import procesar_evento_auditoria
 
 
 # ============================================================================
@@ -234,6 +236,19 @@ def crear_programacion(
         datos = programacion_in.model_dump()
         nueva_programacion = Programacion(**datos)
         db.add(nueva_programacion)
+        db.flush()
+
+        from app.services.audit_event_processor import registrar_evento_crud
+        registrar_evento_crud(
+            db,
+            tabla_afectada="programaciones",
+            registro_id=nueva_programacion.id,
+            encargado_id=programacion_in.encargado_id,
+            accion="create",
+            valor_nuevo=EstadoProgramacionEnum.PENDIENTE.value,
+            equipo_id=programacion_in.equipo_id,
+        )
+
         db.commit()
         db.refresh(nueva_programacion)
 
@@ -455,4 +470,49 @@ def obtener_proximas_programaciones(
         .order_by(Programacion.fecha_programada)
         .all()
     )
+
+
+def cancelar_programacion_con_auditoria(
+    db: Session,
+    programacion_id: int,
+    justificacion: str,
+    encargado_id: int,
+) -> Optional[Programacion]:
+    """
+    Cancela una programación registrando un evento de negocio con motivo documentado.
+
+    Regla de negocio: la justificación ya fue validada por Pydantic antes de invocar este servicio.
+    """
+    programacion = obtener_programacion_por_id(db, programacion_id)
+    if not programacion:
+        return None
+
+    estado_anterior = programacion.estado
+
+    try:
+        programacion.estado = EstadoProgramacionEnum.CANCELADO.value
+
+        procesar_evento_auditoria(
+            db,
+            EventoAuditoriaCreate(
+                tipo_evento=TipoEventoEnum.PROGRAMACION_MANTENIMIENTO,
+                encargado_id=encargado_id,
+                registro_id=programacion_id,
+                tabla_afectada="programaciones",
+                campo="cancelacion",
+                estado_anterior=estado_anterior,
+                estado_nuevo=EstadoProgramacionEnum.CANCELADO.value,
+                justificacion=justificacion,
+                equipo_id=programacion.equipo_id,
+            ),
+            flush=True,
+        )
+
+        db.commit()
+        db.refresh(programacion)
+        return programacion
+
+    except IntegrityError:
+        db.rollback()
+        raise
 

@@ -10,6 +10,7 @@ from app.models.espacio import Espacio
 from app.models.bloque import Bloque
 from app.models.tipo_espacio import TipoEspacio
 from app.models.tipo_equipo import TipoEquipo
+from app.models.tipo_gas_refrigerante import TipoGasRefrigerante
 from app.models.tipo_mantenimiento import TipoMantenimiento
 from app.models.tipo_componente import TipoComponente
 from app.models.mantenimiento import Mantenimiento
@@ -26,6 +27,7 @@ __all__ = [
     "Bloque",
     "TipoEspacio",
     "TipoEquipo",
+    "TipoGasRefrigerante",
     "TipoMantenimiento",
     "TipoComponente",
     "Mantenimiento",

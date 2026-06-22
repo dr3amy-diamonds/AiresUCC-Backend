@@ -55,17 +55,41 @@ class EspacioBase(BaseModel):
     )
 
 
-class EspacioCreate(EspacioBase):
+class EspacioCreate(BaseModel):
     """
     Esquema para creación de nuevo espacio.
 
-    Validación Pydantic:
-    - Código único a nivel global (previene duplicados)
-    - Nombre descriptivo para UI
-    - Piso opcional pero recomendado
-    - FKs deben existir en BD (validado en servicio)
+    tipo_espacio_id es opcional: el modal rápido de gestión no lo envía;
+    el backend asigna un tipo por defecto del catálogo cuando falta.
     """
-    pass
+    codigo_espacio: str = Field(
+        ...,
+        min_length=1,
+        max_length=20,
+        description="Código físico único en la puerta del salón (ej: 'A-204')"
+    )
+    nombre: str = Field(
+        ...,
+        min_length=1,
+        max_length=65,
+        description="Nombre del espacio (ej: 'Aula 204', 'Laboratorio 1')"
+    )
+    piso: Optional[int] = Field(
+        None,
+        ge=0,
+        le=20,
+        description="Número de piso para visualización (0: PB, 1-20: pisos superiores)"
+    )
+    bloque_id: int = Field(
+        ...,
+        gt=0,
+        description="ID del bloque al que pertenece este espacio"
+    )
+    tipo_espacio_id: Optional[int] = Field(
+        None,
+        gt=0,
+        description="ID del tipo de espacio. Opcional; si no se envía, se usa uno por defecto."
+    )
 
 
 class EspacioUpdate(BaseModel):

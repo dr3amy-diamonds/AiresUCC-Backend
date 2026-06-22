@@ -18,22 +18,29 @@ Arquitectura:
 - Documentación con ejemplos
 """
 
-from typing import Optional
+from typing import Optional, List
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError
 
 from app.db.session import get_db
+from app.core.security import get_current_user
+from app.models.usuario import Usuario
+from app.models.programacion import Programacion
+from app.models.equipo import Equipo
+from app.models.espacio import Espacio
 from app.schemas.programacion import (
     ProgramacionCreate,
     ProgramacionResponse,
+    ProgramacionRead,
     ProgramacionUpdate,
     ProgramacionListResponse,
     EstadoProgramacionEnum,
     ProgramacionesPorEstado,
     ProgramacionResumenAnalytica,
 )
+from app.schemas.auditoria import CancelacionProgramacionRequest
 from app.services import programacion as programacion_service
 from app.services import mantenimiento as mantenimiento_service
 
@@ -156,6 +163,102 @@ def listar_programaciones(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+
+@router.get(
+    "/mis-asignadas",
+    response_model=List[ProgramacionRead],
+    summary="Listar programaciones asignadas al técnico autenticado",
+    description="""
+    Devuelve las órdenes de trabajo asignadas al técnico logueado.
+
+    **Seguridad:** El ID del técnico se obtiene del JWT (`current_user.id`).
+    No se acepta `tecnico_id` como parámetro de URL.
+
+    **Filtros aplicados:**
+    - `encargado_id` = usuario autenticado
+    - `estado` en Pendiente o En progreso
+
+    **Orden:** `fecha_programada` ascendente (tareas más antiguas primero).
+    """,
+)
+def obtener_mis_programaciones_asignadas(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> List[ProgramacionRead]:
+    """Consultar programaciones activas asignadas al técnico autenticado."""
+    try:
+        programaciones = (
+            db.query(Programacion)
+            .options(
+                joinedload(Programacion.equipo)
+                .joinedload(Equipo.espacio)
+                .joinedload(Espacio.bloque),
+                joinedload(Programacion.equipo).joinedload(Equipo.marca),
+                joinedload(Programacion.tipo_mantenimiento),
+            )
+            .filter(
+                Programacion.encargado_id == current_user.id,
+                Programacion.estado.in_([
+                    EstadoProgramacionEnum.PENDIENTE.value,
+                    EstadoProgramacionEnum.EN_PROGRESO.value,
+                ]),
+            )
+            .order_by(Programacion.fecha_programada.asc())
+            .all()
+        )
+        return programaciones
+
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al consultar las programaciones asignadas",
+        )
+
+
+@router.get(
+    "/orden/{orden_id}",
+    response_model=ProgramacionRead,
+    summary="Precarga de orden para el formulario técnico",
+    description="""
+    Devuelve una programación con equipo, marca, modelo, bloque y aula
+    para pre-llenar el formulario de reporte (`?orden_id=`).
+
+    **Seguridad:** Solo el técnico asignado puede consultar órdenes activas o históricas propias.
+    """,
+)
+def obtener_orden_para_reporte(
+    orden_id: int = Path(..., gt=0, description="ID de la orden de programación"),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> ProgramacionRead:
+    """Consulta una orden con datos de equipo y ubicación para precarga read-only."""
+    programacion = (
+        db.query(Programacion)
+        .options(
+            joinedload(Programacion.equipo)
+            .joinedload(Equipo.espacio)
+            .joinedload(Espacio.bloque),
+            joinedload(Programacion.equipo).joinedload(Equipo.marca),
+            joinedload(Programacion.tipo_mantenimiento),
+        )
+        .filter(Programacion.id == orden_id)
+        .first()
+    )
+
+    if not programacion:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Orden {orden_id} no encontrada",
+        )
+
+    if programacion.encargado_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permiso para consultar esta orden",
+        )
+
+    return programacion
 
 
 @router.get(
@@ -423,14 +526,19 @@ def completar_programacion(
 @router.put(
     "/{programacion_id}/cancelar",
     response_model=ProgramacionResponse,
-    summary="Cancelar programación",
+    summary="Cancelar programación con justificación obligatoria",
 )
 def cancelar_programacion(
     programacion_id: int = Path(..., gt=0),
-    razon: Optional[str] = Query(None, max_length=200, description="Razón de la cancelación"),
+    body: CancelacionProgramacionRequest = ...,
     db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
 ) -> ProgramacionResponse:
-    """Cancelar una programación."""
+    """
+    Cancela una programación registrando un evento de negocio.
+
+    Regla de negocio: Pydantic valida la justificación antes de ejecutar la cancelación.
+    """
     prog = programacion_service.obtener_programacion_por_id(db, programacion_id)
 
     if not prog:
@@ -439,21 +547,26 @@ def cancelar_programacion(
             detail=f"Programación {programacion_id} no encontrada"
         )
 
-    try:
-        cancelada = programacion_service.cambiar_estado_programacion(
-            db,
-            programacion_id,
-            EstadoProgramacionEnum.CANCELADO.value
+    if prog.estado in (
+        EstadoProgramacionEnum.COMPLETADO.value,
+        EstadoProgramacionEnum.CANCELADO.value,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"La programación ya está en estado '{prog.estado}'",
         )
 
-        # Actualizar observaciones con razón
-        if razon:
-            cancelada.observaciones = f"Cancelada: {razon}"
-            db.commit()
-            db.refresh(cancelada)
-
+    try:
+        cancelada = programacion_service.cancelar_programacion_con_auditoria(
+            db,
+            programacion_id,
+            body.justificacion,
+            current_user.id,
+        )
         return cancelada
 
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

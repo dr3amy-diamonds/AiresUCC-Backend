@@ -168,6 +168,12 @@ def servir_logs_seguridad():
 def servir_formulario_tecnico():
     return FileResponse(os.path.join(FRONTEND_DIR, "service_report_form.html"))
 
+
+@app.get("/mis-ordenes", tags=["Interfaces de Usuario"])
+@app.get("/mis_ordenes.html", tags=["Interfaces de Usuario"])
+def servir_agenda_tecnico():
+    return FileResponse(os.path.join(FRONTEND_DIR, "mis_ordenes.html"))
+
 # ============================================================================
 # 🔒 CRÍTICO: BLOQUEO ABSOLUTO DE ARCHIVOS MODALES
 # Al NO declarar endpoints ni alias para asset_technical_sheet.html ni

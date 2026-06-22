@@ -18,6 +18,7 @@ from app.db.session import get_db
 from app.models.espacio import Espacio
 from app.models.bloque import Bloque
 from app.models.equipo import Equipo
+from app.models.tipo_espacio import TipoEspacio
 from app.schemas.espacio import (
     EspacioCreate,
     EspacioUpdate,
@@ -27,6 +28,27 @@ from app.schemas.espacio import (
 )
 
 router = APIRouter(prefix="/espacios", tags=["espacios"])
+
+
+def _resolver_tipo_espacio_id(db: Session, tipo_espacio_id: int | None) -> int:
+    """Usa el tipo indicado o asigna uno por defecto del catálogo."""
+    if tipo_espacio_id is not None:
+        tipo = db.query(TipoEspacio).filter(TipoEspacio.id == tipo_espacio_id).first()
+        if not tipo:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"El tipo de espacio especificado no existe (ID: {tipo_espacio_id})"
+            )
+        return tipo_espacio_id
+
+    tipo = db.query(TipoEspacio).order_by(TipoEspacio.id).first()
+    if tipo:
+        return tipo.id
+
+    tipo_general = TipoEspacio(nombre="General")
+    db.add(tipo_general)
+    db.flush()
+    return tipo_general.id
 
 
 # ============================================================================
@@ -233,6 +255,8 @@ def crear_espacio(
                 detail=f"El bloque especificado no existe (ID: {espacio_in.bloque_id})"
             )
 
+        tipo_espacio_id = _resolver_tipo_espacio_id(db, espacio_in.tipo_espacio_id)
+
         # 2. VALIDACIÓN DE UNICIDAD: Verificar que codigo_espacio no existe
         espacio_existente = db.query(Espacio).filter(
             Espacio.codigo_espacio == espacio_in.codigo_espacio
@@ -245,7 +269,8 @@ def crear_espacio(
             )
 
         # 3. Crear el nuevo espacio
-        datos_espacio = espacio_in.model_dump()
+        datos_espacio = espacio_in.model_dump(exclude={"tipo_espacio_id"})
+        datos_espacio["tipo_espacio_id"] = tipo_espacio_id
         nuevo_espacio = Espacio(**datos_espacio)
 
         # Agregar a la sesión y hacer commit

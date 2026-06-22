@@ -20,14 +20,60 @@ El campo 'registrado_por' debe ser inyectado desde JWT del usuario autenticado.
 
 from typing import Optional, List, Tuple
 from datetime import datetime, date, timedelta
+from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func, desc
 
 from app.models.mantenimiento import Mantenimiento
+from app.models.programacion import Programacion
 from app.models.equipo import Equipo
 from app.models.usuario import Usuario
-from app.schemas.mantenimiento import MantenimientoCreate, MantenimientoUpdate
+from app.models.componente_usado import ComponenteUsado
+from app.models.tipo_componente import TipoComponente
+from app.schemas.mantenimiento import (
+    MantenimientoCreate,
+    MantenimientoUpdate,
+    CerrarOrdenRequest,
+    ComponenteUsadoInput,
+)
+from app.schemas.programacion import EstadoProgramacionEnum
+from app.schemas.auditoria import EventoAuditoriaCreate, TipoEventoEnum
+from app.services.audit_event_processor import procesar_evento_auditoria
+
+
+def _persistir_componentes_mantenimiento(
+    db: Session,
+    mantenimiento_id: int,
+    componentes: List[ComponenteUsadoInput],
+) -> None:
+    """Registra insumos fijos y adicionales en componentes_usados."""
+    for item in componentes:
+        if item.repuesto_utilizado_id:
+            repuesto_id = item.repuesto_utilizado_id
+        else:
+            nombre = (item.nombre or "").strip()
+            existente = (
+                db.query(TipoComponente)
+                .filter(TipoComponente.nombre == nombre)
+                .first()
+            )
+            if existente:
+                repuesto_id = existente.id
+            else:
+                nuevo_tipo = TipoComponente(nombre=nombre)
+                db.add(nuevo_tipo)
+                db.flush()
+                repuesto_id = nuevo_tipo.id
+
+        db.add(
+            ComponenteUsado(
+                cantidad=Decimal(str(item.cantidad)),
+                precio_unitario=Decimal(str(item.precio_unitario)),
+                mantenimiento_realizado_id=mantenimiento_id,
+                repuesto_utilizado_id=repuesto_id,
+            )
+        )
 
 
 # ============================================================================
@@ -269,6 +315,114 @@ def crear_mantenimiento(
             orig=e.orig
         ) from e
     except Exception as e:
+        db.rollback()
+        raise
+
+
+def cerrar_orden_atomica(
+    db: Session,
+    orden_id: int,
+    payload: CerrarOrdenRequest,
+    usuario_id: int,
+) -> Tuple[Mantenimiento, Programacion, int]:
+    """
+    Cierre técnico atómico: mantenimiento + programación + auditoría en un solo commit.
+
+    Pasos (sin commit intermedio):
+    1. INSERT mantenimientos (costo = materiales, sin mano de obra)
+    2. UPDATE programaciones → Completado + mantenimiento_id
+    3. INSERT auditoria (estado y mantenimiento_id)
+
+    Raises:
+        ValueError: Orden inexistente, ya cerrada o técnico no asignado
+        IntegrityError: Violación de integridad referencial
+    """
+    programacion = (
+        db.query(Programacion)
+        .filter(Programacion.id == orden_id)
+        .first()
+    )
+    if not programacion:
+        raise ValueError(f"Orden de programación {orden_id} no encontrada")
+
+    if programacion.estado in (
+        EstadoProgramacionEnum.COMPLETADO.value,
+        EstadoProgramacionEnum.CANCELADO.value,
+    ):
+        raise ValueError(
+            f"La orden {orden_id} ya está en estado '{programacion.estado}' y no admite modificaciones"
+        )
+
+    if programacion.encargado_id != usuario_id:
+        raise ValueError("Solo el técnico asignado puede cerrar esta orden")
+
+    equipo = db.query(Equipo).filter(Equipo.id == programacion.equipo_id).first()
+    if not equipo:
+        raise ValueError(f"Equipo {programacion.equipo_id} asociado a la orden no existe")
+
+    estado_anterior = programacion.estado
+
+    try:
+        nuevo_mantenimiento = Mantenimiento(
+            fecha_mantenimiento=payload.fecha_mantenimiento,
+            detalle_mantenimiento=payload.detalle_mantenimiento,
+            costo_servicio=Decimal(str(payload.costo_servicio)),
+            equipo_id=programacion.equipo_id,
+            encargado_id=programacion.encargado_id,
+            tipo_mantenimiento_id=programacion.tipo_mantenimiento_id,
+            registrado_por=usuario_id,
+        )
+        db.add(nuevo_mantenimiento)
+        db.flush()
+
+        if payload.componentes:
+            _persistir_componentes_mantenimiento(
+                db, nuevo_mantenimiento.id, payload.componentes
+            )
+
+        programacion.estado = EstadoProgramacionEnum.COMPLETADO.value
+        programacion.mantenimiento_id = nuevo_mantenimiento.id
+
+        equipo.ultima_fecha = payload.fecha_mantenimiento
+        equipo.proxima_fecha = payload.fecha_mantenimiento + timedelta(days=90)
+        equipo.estado = "Operativo"
+        equipo.updated_at = datetime.now()
+
+        detalle_operativo = (
+            f"Se registró el mantenimiento #{nuevo_mantenimiento.id} "
+            f"con costo de materiales ${payload.costo_servicio:,.0f} COP."
+        )
+        procesar_evento_auditoria(
+            db,
+            EventoAuditoriaCreate(
+                tipo_evento=TipoEventoEnum.PROGRAMACION_MANTENIMIENTO,
+                encargado_id=usuario_id,
+                registro_id=orden_id,
+                tabla_afectada="programaciones",
+                campo="cierre_orden",
+                estado_anterior=estado_anterior,
+                estado_nuevo=EstadoProgramacionEnum.COMPLETADO.value,
+                equipo_id=programacion.equipo_id,
+                detalle_operativo=detalle_operativo,
+                mantenimiento_id=nuevo_mantenimiento.id,
+            ),
+            flush=True,
+        )
+
+        db.commit()
+        db.refresh(nuevo_mantenimiento)
+        db.refresh(programacion)
+
+        return nuevo_mantenimiento, programacion, 1
+
+    except IntegrityError as e:
+        db.rollback()
+        raise IntegrityError(
+            statement="Error al cerrar la orden de forma atómica",
+            params={"orden_id": orden_id},
+            orig=e.orig,
+        ) from e
+    except Exception:
         db.rollback()
         raise
 

@@ -11,6 +11,11 @@ from jose import JWTError, jwt
 from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.models.usuario import Usuario
+from app.services import usuario as usuario_service
 
 # Cargar variables de entorno
 load_dotenv()
@@ -191,4 +196,48 @@ def require_role(*allowed_roles: str):
         return datos_token
 
     return check_role
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+    db: Session = Depends(get_db),
+) -> Usuario:
+    """
+    Dependencia que valida el JWT y retorna el usuario autenticado.
+
+    El ID del técnico se obtiene desde current_user.id; nunca debe
+    exponerse como parámetro de URL por motivos de seguridad.
+    """
+    datos_token = verificar_token(credentials.credentials)
+
+    if not datos_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido o expirado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    correo = datos_token.get("sub")
+    if not correo:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token no contiene identificador de usuario",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    usuario = usuario_service.obtener_usuario_por_email(db, correo)
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuario no encontrado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not usuario.activo:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Usuario inactivo en el sistema",
+        )
+
+    return usuario
 

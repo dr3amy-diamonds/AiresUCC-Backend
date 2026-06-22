@@ -24,6 +24,7 @@ class EspacioResumenEquipo(BaseModel):
     codigo_espacio: str
     nombre: str
     piso: Optional[int] = None
+    bloque_id: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 

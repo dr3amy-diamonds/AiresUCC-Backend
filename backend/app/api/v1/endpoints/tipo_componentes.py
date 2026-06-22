@@ -4,23 +4,30 @@ API REST para consultar el catálogo de repuestos disponibles en el campus.
 """
 
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.tipo_componente import TipoComponente
 from app.schemas.tipo_componente import TipoComponenteResponse
+from app.schemas.mantenimiento import INSUMOS_FIJOS_TALLER
 
 router = APIRouter(prefix="/tipo_componentes", tags=["tipo_componentes"])
 
 @router.get("/", response_model=List[TipoComponenteResponse])
-def listar_tipo_componentes(db: Session = Depends(get_db)):
+def listar_tipo_componentes(
+    fijos: bool = Query(False, description="Si es true, devuelve solo los 3 insumos fijos del taller"),
+    db: Session = Depends(get_db),
+):
     """
-    Obtiene la lista completa de repuestos predeterminados (Capacitor, Filtro, etc.)
-    para pintar las casillas de verificación (checkboxes) en el formulario del técnico.
+    Catálogo de repuestos. Con fijos=true retorna únicamente los tres insumos
+    predeterminados del formulario técnico.
     """
     try:
-        componentes = db.query(TipoComponente).all()
+        query = db.query(TipoComponente)
+        if fijos:
+            query = query.filter(TipoComponente.nombre.in_(INSUMOS_FIJOS_TALLER))
+        componentes = query.order_by(TipoComponente.id).all()
         return componentes
     except Exception as e:
         raise HTTPException(

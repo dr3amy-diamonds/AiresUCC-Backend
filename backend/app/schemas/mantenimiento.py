@@ -16,9 +16,16 @@ Arquitectura:
 """
 
 from datetime import datetime, date
-from typing import Optional
-from pydantic import BaseModel, Field, ConfigDict
+from typing import List, Optional
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 from enum import Enum
+
+
+INSUMOS_FIJOS_TALLER = frozenset({
+    "Capacitor de Marcha",
+    "Bomba de Condensación",
+    "Embobinado de Motor",
+})
 
 
 # ============================================================================
@@ -101,6 +108,78 @@ class MantenimientoCreate(MantenimientoBase):
     )
 
 
+class ComponenteUsadoInput(BaseModel):
+    """Insumo consumido en el cierre de orden: fijo (por ID) o adicional (por nombre)."""
+    repuesto_utilizado_id: Optional[int] = Field(
+        None, gt=0, description="ID del insumo fijo del catálogo",
+    )
+    nombre: Optional[str] = Field(
+        None, min_length=2, max_length=60, description="Nombre libre para insumos adicionales",
+    )
+    cantidad: float = Field(..., gt=0, description="Cantidad utilizada")
+    precio_unitario: float = Field(..., ge=0, description="Valor unitario en COP")
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def validar_referencia_insumo(self) -> "ComponenteUsadoInput":
+        tiene_id = self.repuesto_utilizado_id is not None
+        tiene_nombre = bool((self.nombre or "").strip())
+        if tiene_id == tiene_nombre:
+            raise ValueError(
+                "Cada insumo debe indicar repuesto_utilizado_id (fijo) o nombre (adicional), no ambos."
+            )
+        return self
+
+
+class CerrarOrdenRequest(BaseModel):
+    """
+    Payload para el cierre técnico atómico de una orden de programación.
+
+    El costo_servicio proviene exclusivamente de la sumatoria de materiales
+    consumidos en taller (sin mano de obra).
+    """
+    fecha_mantenimiento: date = Field(
+        ...,
+        description="Fecha en que se ejecutó el servicio de campo (YYYY-MM-DD)",
+    )
+    detalle_mantenimiento: str = Field(
+        ...,
+        min_length=15,
+        max_length=4000,
+        description="Descripción técnica del trabajo realizado (mínimo 15 caracteres)",
+    )
+    costo_servicio: float = Field(
+        ...,
+        ge=0,
+        description="Costo total del servicio = sumatoria lineal de materiales consumidos",
+    )
+    componentes: List[ComponenteUsadoInput] = Field(
+        default_factory=list,
+        description="Insumos fijos y adicionales consumidos en el servicio",
+    )
+
+    @field_validator("detalle_mantenimiento")
+    @classmethod
+    def validar_detalle_no_vacio(cls, valor: str) -> str:
+        limpio = valor.strip()
+        if len(limpio) < 15:
+            raise ValueError("El detalle del mantenimiento debe tener al menos 15 caracteres")
+        return limpio
+
+    @model_validator(mode="after")
+    def validar_costo_coherente_con_componentes(self) -> "CerrarOrdenRequest":
+        total_componentes = sum(c.cantidad * c.precio_unitario for c in self.componentes)
+        if abs(total_componentes - self.costo_servicio) > 0.01:
+            raise ValueError(
+                "El costo_servicio debe coincidir con la sumatoria de cantidad × valor unitario "
+                "de todos los insumos registrados."
+            )
+        return self
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class MantenimientoUpdate(BaseModel):
     """
     Esquema para actualizar un mantenimiento existente.
@@ -177,6 +256,19 @@ class MantenimientoResponse(BaseModel):
     tipo_mantenimiento_id: int = Field(..., gt=0, description="ID del tipo de mantenimiento")
     registrado_por: int = Field(..., gt=0, description="ID del usuario que registró el mantenimiento")
     created_at: datetime = Field(..., description="Timestamp de creación del registro")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CerrarOrdenResponse(BaseModel):
+    """Respuesta del triple disparo atómico: mantenimiento + programación + auditoría."""
+    mantenimiento: MantenimientoResponse
+    programacion_id: int
+    programacion_estado: str
+    auditoria_registros: int = Field(
+        ...,
+        description="Cantidad de filas insertadas en la bitácora de auditoría",
+    )
 
     model_config = ConfigDict(from_attributes=True)
 

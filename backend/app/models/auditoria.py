@@ -35,6 +35,16 @@ class Auditoria(Base):
     valor_nuevo: str = Column(Text, nullable=True)
     fecha_cambio: datetime = Column(DateTime, server_default="NOW()", nullable=False, index=True)
 
+    # Capa de Auditoría de Negocio (eventos con snapshot y narrativa)
+    tipo_evento: str = Column(String(40), nullable=True, index=True)
+    actor_nombre: str = Column(String(120), nullable=True, index=True)
+    actor_rol: str = Column(String(60), nullable=True)
+    actor_rol_etiqueta: str = Column(String(80), nullable=True)
+    ubicacion_snapshot: str = Column(Text, nullable=True)
+    recurso_descripcion: str = Column(String(200), nullable=True)
+    narrativa: str = Column(Text, nullable=True)
+    justificacion: str = Column(Text, nullable=True)
+
     # Claves foráneas
     encargado_id: int = Column(Integer, ForeignKey("gestion_aires_ucc.encargados.id"), nullable=True)
 

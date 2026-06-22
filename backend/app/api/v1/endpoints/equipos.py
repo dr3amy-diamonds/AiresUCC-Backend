@@ -12,6 +12,7 @@ from sqlalchemy import desc
 from app.db.session import get_db
 from app.models.equipo import Equipo
 from app.models.mantenimiento import Mantenimiento
+from app.models.usuario import Usuario
 
 from app.schemas.equipo import EquipoCreate, EquipoUpdate, EquipoResponse, EquipoListResponse, ActivarEquipoRequest
 from app.schemas.mantenimiento import MantenimientoHistorialEquipoResponse
@@ -24,8 +25,10 @@ from app.services.equipo import (
     crear_equipo,
     actualizar_equipo,
     eliminar_equipo,
-    cambiar_estado_equipo
+    cambiar_estado_equipo,
 )
+from app.core.security import get_current_user
+from app.services.audit_event_processor import registrar_evento_crud
 
 router = APIRouter(prefix="/equipos", tags=["equipos"])
 
@@ -110,11 +113,24 @@ def listar_equipos_por_estado(estado: str, db: Session = Depends(get_db)):
 @router.post("/", response_model=EquipoResponse, status_code=status.HTTP_201_CREATED)
 def crear_equipo_endpoint(
     equipo_in: EquipoCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
 ):
     """Registra un nuevo aire acondicionado en el sistema."""
     try:
         equipo = crear_equipo(db, equipo_in)
+        registrar_evento_crud(
+            db,
+            tabla_afectada="equipos",
+            registro_id=equipo.id,
+            encargado_id=current_user.id,
+            accion="create",
+            valor_nuevo=equipo.codigo_activo,
+            equipo_id=equipo.id,
+            recurso_descripcion=equipo.codigo_activo,
+        )
+        db.commit()
+        db.refresh(equipo)
         return EquipoResponse.model_validate(equipo)
     except ValueError as ve:
         # Capturar errores de validación (duplicados, etc)
@@ -129,7 +145,8 @@ def crear_equipo_endpoint(
 def actualizar_equipo_endpoint(
     equipo_id: int,
     equipo_in: EquipoUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
 ):
     """Actualiza los datos de un equipo existente."""
     equipo = obtener_equipo_por_id(db, equipo_id)
@@ -137,7 +154,21 @@ def actualizar_equipo_endpoint(
         raise HTTPException(status_code=404, detail="Equipo no encontrado")
 
     try:
+        codigo_anterior = equipo.codigo_activo
         equipo_actualizado = actualizar_equipo(db, equipo, equipo_in)
+        registrar_evento_crud(
+            db,
+            tabla_afectada="equipos",
+            registro_id=equipo_id,
+            encargado_id=current_user.id,
+            accion="update",
+            valor_anterior=codigo_anterior,
+            valor_nuevo=equipo_actualizado.codigo_activo,
+            equipo_id=equipo_id,
+            recurso_descripcion=equipo_actualizado.codigo_activo,
+        )
+        db.commit()
+        db.refresh(equipo_actualizado)
         return EquipoResponse.model_validate(equipo_actualizado)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -159,21 +190,32 @@ def cambiar_estado_endpoint(
 
 @router.delete("/{equipo_id}", status_code=status.HTTP_204_NO_CONTENT)
 @router.delete("/{equipo_id}", status_code=status.HTTP_200_OK)
-def eliminar_equipo_endpoint(equipo_id: int, db: Session = Depends(get_db)):
+def eliminar_equipo_endpoint(
+    equipo_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
     """Elimina un equipo del sistema (Baja de activo)."""
-    # 1. Verificar si el aire existe en la base de datos
     equipo = obtener_equipo_por_id(db, equipo_id)
     if not equipo:
         raise HTTPException(status_code=404, detail="Equipo no encontrado")
 
+    codigo = equipo.codigo_activo
+
     try:
-        # 2. Intentar ejecutar la eliminación lógica/física en el servicio
         eliminar_equipo(db, equipo_id)
-
-        # Forzamos un flush/commit si el servicio no lo hace,
-        # para obligar a PostgreSQL a validar las llaves foráneas de inmediato
         db.flush()
-
+        registrar_evento_crud(
+            db,
+            tabla_afectada="equipos",
+            registro_id=equipo_id,
+            encargado_id=current_user.id,
+            accion="delete",
+            valor_anterior=codigo,
+            equipo_id=equipo_id,
+            recurso_descripcion=codigo,
+        )
+        db.commit()
         return {"detail": "El equipo fue eliminado correctamente del inventario."}
 
     except Exception as e:
