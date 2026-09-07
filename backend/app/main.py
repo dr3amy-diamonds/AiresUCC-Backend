@@ -119,66 +119,80 @@ if os.path.exists(os.path.join(FRONTEND_DIR, "img")):
 # ============================================================================
 
 @app.get("/", tags=["Interfaces de Usuario"])
+@app.get("/login", tags=["Interfaces de Usuario"])
 @app.get("/auth_login.html", tags=["Interfaces de Usuario"])
 def servir_portal_acceso():
-    """Soporta tanto la IP limpia como el llamado físico al Login"""
+    """Autenticación y acceso — URL limpia /login con alias legacy"""
     return FileResponse(os.path.join(FRONTEND_DIR, "auth_login.html"))
 
 
 @app.get("/dashboard", tags=["Interfaces de Usuario"])
 @app.get("/analytics_dashboard.html", tags=["Interfaces de Usuario"])
 def servir_dashboard_analitica():
-    """Soporta la navegación limpia y los clicks desde el menú lateral"""
+    """Indicadores y analítica"""
     return FileResponse(os.path.join(FRONTEND_DIR, "analytics_dashboard.html"))
 
 
 @app.get("/inventario", tags=["Interfaces de Usuario"])
-@app.get("/asset_inventory.html", tags=["Interfaces de Usuario"])  # <-- ¡EL ALIAS QUE SOLUCIONA TU ERROR!
+@app.get("/asset_inventory.html", tags=["Interfaces de Usuario"])
 def servir_inventario_activos():
-    """Muestra el inventario respondiendo de forma segura a ambas peticiones de URL"""
+    """Gestión de equipos y hojas de vida"""
     return FileResponse(os.path.join(FRONTEND_DIR, "asset_inventory.html"))
 
 
 @app.get("/programacion", tags=["Interfaces de Usuario"])
 @app.get("/maintenance_scheduler.html", tags=["Interfaces de Usuario"])
 def servir_agenda_planificada():
+    """Agenda operativa de servicios"""
     return FileResponse(os.path.join(FRONTEND_DIR, "maintenance_scheduler.html"))
 
 
+@app.get("/usuarios", tags=["Interfaces de Usuario"])
 @app.get("/gestion-usuarios", tags=["Interfaces de Usuario"])
 @app.get("/admin_access_control.html", tags=["Interfaces de Usuario"])
 def servir_control_accesos():
+    """Control de acceso y roles"""
     return FileResponse(os.path.join(FRONTEND_DIR, "admin_access_control.html"))
 
 
+@app.get("/exportar", tags=["Interfaces de Usuario"])
 @app.get("/exportar-datos", tags=["Interfaces de Usuario"])
 @app.get("/data_export_center.html", tags=["Interfaces de Usuario"])
 def servir_centro_exportacion():
+    """Centro de exportación de datos"""
     return FileResponse(os.path.join(FRONTEND_DIR, "data_export_center.html"))
 
 
+@app.get("/auditoria", tags=["Interfaces de Usuario"])
 @app.get("/auditoria-sistema", tags=["Interfaces de Usuario"])
 @app.get("/maintenance_audit_logs.html", tags=["Interfaces de Usuario"])
 def servir_logs_seguridad():
+    """Bitácora de eventos y gestión"""
     return FileResponse(os.path.join(FRONTEND_DIR, "maintenance_audit_logs.html"))
 
 
 @app.get("/reporte-tecnico", tags=["Interfaces de Usuario"])
 @app.get("/service_report_form.html", tags=["Interfaces de Usuario"])
 def servir_formulario_tecnico():
+    """Cierre de orden e insumos"""
     return FileResponse(os.path.join(FRONTEND_DIR, "service_report_form.html"))
 
 
 @app.get("/mis-ordenes", tags=["Interfaces de Usuario"])
 @app.get("/mis_ordenes.html", tags=["Interfaces de Usuario"])
 def servir_agenda_tecnico():
+    """Agenda de mantenimiento del técnico"""
     return FileResponse(os.path.join(FRONTEND_DIR, "mis_ordenes.html"))
 
+
+@app.get("/perfil", tags=["Interfaces de Usuario"])
+@app.get("/user_profile_settings.html", tags=["Interfaces de Usuario"])
+def servir_ajustes_perfil():
+    """Ajustes de cuenta de usuario"""
+    return FileResponse(os.path.join(FRONTEND_DIR, "user_profile_settings.html"))
+
 # ============================================================================
-# 🔒 CRÍTICO: BLOQUEO ABSOLUTO DE ARCHIVOS MODALES
-# Al NO declarar endpoints ni alias para asset_technical_sheet.html ni
-# user_profile_settings.html, FastAPI les aplicará un 404 automático (Not Found)
-# si intentan abrirse de forma independiente en el navegador.
+# 🔒 BLOQUEO: asset_technical_sheet.html no tiene ruta pública (404 automático)
 # ============================================================================
 
 
