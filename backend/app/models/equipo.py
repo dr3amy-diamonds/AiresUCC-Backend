@@ -43,7 +43,6 @@ class Equipo(Base):
     capacidad_btu: int = Column(Integer, nullable=False)
     fecha_instalacion: Optional[date] = Column(Date, nullable=True)
     estado: str = Column(String(20), default="Operativo", nullable=False)
-    dependencia: str = Column(String(20), default="Chiller")
     created_at: datetime = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at: datetime = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
