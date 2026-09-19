@@ -68,6 +68,7 @@ def listar_programaciones(
     equipo_id: Optional[int] = None,
     encargado_id: Optional[int] = None,
     solo_vencidas: bool = False,
+    anio: Optional[int] = None,
 ) -> Tuple[List[Programacion], int, int]:
     """
     Obtiene lista paginada de programaciones con filtros.
@@ -96,6 +97,9 @@ def listar_programaciones(
 
     if encargado_id is not None:
         query = query.filter(Programacion.encargado_id == encargado_id)
+
+    if anio is not None:
+        query = query.filter(func.date_part('year', Programacion.fecha_programada) == anio)
 
     if solo_vencidas:
         hoy = datetime.now().date()

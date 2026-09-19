@@ -147,6 +147,13 @@ def servir_agenda_planificada():
     return FileResponse(os.path.join(FRONTEND_DIR, "maintenance_scheduler.html"))
 
 
+@app.get("/calendario", tags=["Interfaces de Usuario"])
+@app.get("/calendar.html", tags=["Interfaces de Usuario"])
+def servir_resumen_mantenimiento():
+    """Resumen anual estilo Excel: todos los espacios sin clics"""
+    return FileResponse(os.path.join(FRONTEND_DIR, "calendar.html"))
+
+
 @app.get("/usuarios", tags=["Interfaces de Usuario"])
 @app.get("/gestion-usuarios", tags=["Interfaces de Usuario"])
 @app.get("/admin_access_control.html", tags=["Interfaces de Usuario"])
@@ -192,7 +199,9 @@ def servir_ajustes_perfil():
     return FileResponse(os.path.join(FRONTEND_DIR, "user_profile_settings.html"))
 
 # ============================================================================
-# 🔒 BLOQUEO: asset_technical_sheet.html no tiene ruta pública (404 automático)
+# Hoja de vida técnica: flujo canónico = modal openTechnicalSheet() en
+# /inventario (inventory-loader.js). Sin página estática separada (distill:
+# se eliminó asset_technical_sheet.html con mocks; 404 automático).
 # ============================================================================
 
 

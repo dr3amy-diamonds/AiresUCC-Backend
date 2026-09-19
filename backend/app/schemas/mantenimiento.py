@@ -260,6 +260,30 @@ class MantenimientoResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class InsumoGastadoResponse(BaseModel):
+    """Insumo consumido en el mantenimiento para el calendario anual."""
+    nombre: str = Field(..., description="Nombre del insumo")
+    cantidad: float = Field(..., description="Cantidad utilizada")
+    precio_unitario: float = Field(..., description="Valor unitario COP")
+    subtotal: float = Field(..., description="cantidad x precio_unitario")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MantenimientoCalendarioResponse(MantenimientoResponse):
+    """
+    Respuesta enriquecida para la matriz 12x31 (/programacion).
+
+    Incluye objetos anidados: técnico, observaciones, insumos y costo final.
+    Hereda todos los campos planos para compatibilidad.
+    """
+    tecnico_nombre: str = Field(default="Sin asignar", description="Nombre completo del técnico")
+    tipo_nombre: Optional[str] = Field(default=None, description="Nombre del tipo (Preventivo/Correctivo)")
+    observaciones: Optional[str] = Field(default=None, description="Alias de detalle_mantenimiento")
+    insumos_gastados: List[InsumoGastadoResponse] = Field(default_factory=list)
+    costo_total: float = Field(default=0.0, description="Alias de costo_servicio")
+
+
 class CerrarOrdenResponse(BaseModel):
     """Respuesta del triple disparo atómico: mantenimiento + programación + auditoría."""
     mantenimiento: MantenimientoResponse

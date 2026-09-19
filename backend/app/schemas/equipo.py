@@ -70,6 +70,7 @@ class EquipoBase(BaseModel):
 
     fecha_instalacion: Optional[date] = Field(None, description="Fecha de instalación del equipo")
     estado: str = Field(default="Operativo", description="Estado operativo actual")
+    dependencia: Optional[str] = Field(default="Chiller", max_length=20, description="Dependencia del equipo (Chiller u Otros)")
     marca_id: int = Field(..., description="ID de la marca")
     tipo_equipo_id: int = Field(..., description="ID del tipo de equipo")
     espacio_id: int = Field(..., description="ID del espacio físico")
@@ -95,6 +96,7 @@ class EquipoUpdate(BaseModel):
     ultima_fecha: Optional[date] = None
     proxima_fecha: Optional[date] = None
     estado: Optional[str] = None
+    dependencia: Optional[str] = Field(None, max_length=20)
     marca_id: Optional[int] = Field(None, gt=0)
     tipo_equipo_id: Optional[int] = Field(None, gt=0)
     espacio_id: Optional[int] = Field(None, gt=0)

@@ -109,6 +109,7 @@ def listar_mantenimientos(
     encargado_id: Optional[int] = None,
     fecha_desde: Optional[date] = None,
     fecha_hasta: Optional[date] = None,
+    anio: Optional[int] = None,
 ) -> Tuple[List[Mantenimiento], int]:
     """
     Obtiene lista paginada de mantenimientos con filtros opcionales.
@@ -149,6 +150,9 @@ def listar_mantenimientos(
 
     if fecha_hasta is not None:
         query = query.filter(Mantenimiento.fecha_mantenimiento <= fecha_hasta)
+
+    if anio is not None:
+        query = query.filter(func.date_part('year', Mantenimiento.fecha_mantenimiento) == anio)
 
     # Contar total antes de paginar
     total = query.count()

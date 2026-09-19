@@ -131,6 +131,7 @@ def listar_programaciones(
     estado: Optional[str] = Query(None, description="Filtrar por estado"),
     equipo_id: Optional[int] = Query(None, gt=0, description="Filtrar por equipo"),
     encargado_id: Optional[int] = Query(None, gt=0, description="Filtrar por técnico"),
+    anio: Optional[int] = Query(None, ge=2000, le=2100, description="Filtrar por año (DATE_PART year fecha_programada)"),
     vencidas: bool = Query(False, description="Mostrar solo vencidas (Pendiente + fecha < hoy)"),
     page: int = Query(1, ge=1, description="Número de página"),
     size: int = Query(10, ge=1, le=100, description="Registros por página"),
@@ -147,6 +148,7 @@ def listar_programaciones(
             equipo_id=equipo_id,
             encargado_id=encargado_id,
             solo_vencidas=vencidas,
+            anio=anio,
         )
 
         return ProgramacionListResponse(
