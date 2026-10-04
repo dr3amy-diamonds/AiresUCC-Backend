@@ -18,6 +18,7 @@ from app.schemas.mantenimiento import (
     CerrarOrdenResponse,
 )
 from app.services import mantenimiento as mantenimiento_service
+from app.services.detalle_mantenimiento import parse_detalle_mantenimiento
 from app.core.security import require_role, get_current_user
 
 router = APIRouter(prefix="/mantenimientos", tags=["mantenimientos"])
@@ -157,6 +158,7 @@ def listar_mantenimientos(
         except Exception:
             insumos = []
         costo = float(getattr(m, "costo_servicio", 0) or 0)
+        parsed = parse_detalle_mantenimiento(m.detalle_mantenimiento)
         resultado.append({
             "id": m.id,
             "fecha_mantenimiento": m.fecha_mantenimiento,
@@ -172,6 +174,10 @@ def listar_mantenimientos(
             "observaciones": m.detalle_mantenimiento,
             "insumos_gastados": insumos,
             "costo_total": costo,
+            "trabajo_realizado": parsed.get("trabajo_realizado"),
+            "estado_final": parsed.get("estado_final"),
+            "hallazgos": parsed.get("hallazgos"),
+            "recomendaciones": parsed.get("recomendaciones"),
         })
     return resultado
 

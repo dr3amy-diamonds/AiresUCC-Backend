@@ -16,6 +16,7 @@ from app.models.usuario import Usuario
 
 from app.schemas.equipo import EquipoCreate, EquipoUpdate, EquipoResponse, EquipoListResponse, ActivarEquipoRequest
 from app.schemas.mantenimiento import MantenimientoHistorialEquipoResponse
+from app.services.detalle_mantenimiento import parse_detalle_mantenimiento
 from app.services.equipo import (
     obtener_equipo_por_id,
     obtener_equipo_por_codigo,
@@ -76,7 +77,13 @@ def listar_mantenimientos_equipo(
             fecha_mantenimiento=m.fecha_mantenimiento,
             detalle_mantenimiento=m.detalle_mantenimiento,
             tipo_nombre=m.tipo.nombre if m.tipo else None,
-            tecnico_nombre=m.encargado.nombre if m.encargado else None,
+            tecnico_nombre=(
+                f"{m.encargado.nombre} {m.encargado.apellido}".strip()
+                if m.encargado and getattr(m.encargado, "nombre", None)
+                else (m.encargado.correo_institucional if m.encargado else None)
+            ),
+            costo_total=float(getattr(m, "costo_servicio", 0) or 0),
+            **parse_detalle_mantenimiento(m.detalle_mantenimiento),
         )
         for m in mantenimientos
     ]

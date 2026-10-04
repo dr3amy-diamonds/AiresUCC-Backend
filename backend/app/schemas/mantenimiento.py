@@ -282,6 +282,10 @@ class MantenimientoCalendarioResponse(MantenimientoResponse):
     observaciones: Optional[str] = Field(default=None, description="Alias de detalle_mantenimiento")
     insumos_gastados: List[InsumoGastadoResponse] = Field(default_factory=list)
     costo_total: float = Field(default=0.0, description="Alias de costo_servicio")
+    trabajo_realizado: Optional[str] = Field(default=None, description="Solo bloque TRABAJO REALIZADO (calendario)")
+    estado_final: Optional[str] = Field(default=None, description="Operativo / En reparación / Dado de baja (calendario)")
+    hallazgos: Optional[str] = Field(default=None, description="Bloque HALLAZGOS (calendario)")
+    recomendaciones: Optional[str] = Field(default=None, description="Bloque RECOMENDACIONES (calendario)")
 
 
 class CerrarOrdenResponse(BaseModel):
@@ -304,6 +308,11 @@ class MantenimientoHistorialEquipoResponse(BaseModel):
     detalle_mantenimiento: Optional[str] = None
     tipo_nombre: Optional[str] = Field(None, description="Nombre del tipo (Preventivo, Correctivo, etc.)")
     tecnico_nombre: Optional[str] = Field(None, description="Nombre del técnico encargado")
+    costo_total: float = Field(default=0.0, description="Valor total del mantenimiento en COP")
+    trabajo_realizado: Optional[str] = Field(default=None, description="Solo bloque TRABAJO REALIZADO")
+    estado_final: Optional[str] = Field(default=None, description="Operativo / En reparación / Dado de baja")
+    hallazgos: Optional[str] = Field(default=None, description="Bloque HALLAZGOS TÉCNICOS")
+    recomendaciones: Optional[str] = Field(default=None, description="Bloque RECOMENDACIONES")
 
     model_config = ConfigDict(from_attributes=True)
 

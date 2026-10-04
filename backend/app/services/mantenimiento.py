@@ -40,6 +40,7 @@ from app.schemas.mantenimiento import (
 from app.schemas.programacion import EstadoProgramacionEnum
 from app.schemas.auditoria import EventoAuditoriaCreate, TipoEventoEnum
 from app.services.audit_event_processor import procesar_evento_auditoria
+from app.services.detalle_mantenimiento import parse_detalle_mantenimiento
 
 
 def _persistir_componentes_mantenimiento(
@@ -298,11 +299,13 @@ def crear_mantenimiento(
         equipo.ultima_fecha = mantenimiento_in.fecha_mantenimiento
         equipo.proxima_fecha = mantenimiento_in.fecha_mantenimiento + timedelta(days=90)
 
-        # 4. ** CAMBIAR ESTADO DEL EQUIPO A "OPERATIVO" **
-        # NOTA: Esta es la lógica crítica de negocio
-        # Si estaba "En reparación" o "Inactivo", pasa a "Operativo"
-        # Registra en auditoría que fue mantenido
-        equipo.estado = "Operativo"
+        # 4. ** SINCRONIZAR ESTADO DEL EQUIPO CON ESTADO FINAL **
+        # Catálogo único: Operativo / En reparación / Dado de baja.
+        # Si el detalle trae estado final, se respeta; si no, fallback a Operativo.
+        estado_final = parse_detalle_mantenimiento(
+            getattr(mantenimiento_in, "detalle_mantenimiento", None)
+        ).get("estado_final")
+        equipo.estado = estado_final or "Operativo"
         equipo.updated_at = datetime.now()
 
         # 5. PERSISTIR CAMBIOS DE MANERA ATÓMICA
@@ -389,7 +392,10 @@ def cerrar_orden_atomica(
 
         equipo.ultima_fecha = payload.fecha_mantenimiento
         equipo.proxima_fecha = payload.fecha_mantenimiento + timedelta(days=90)
-        equipo.estado = "Operativo"
+        estado_final = parse_detalle_mantenimiento(payload.detalle_mantenimiento).get("estado_final")
+        # Catálogo único: Operativo / En reparación / Dado de baja.
+        # Fallback a Operativo para no romper cierres viejos sin bloque de estado.
+        equipo.estado = estado_final or "Operativo"
         equipo.updated_at = datetime.now()
 
         detalle_operativo = (
