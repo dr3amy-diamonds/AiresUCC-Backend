@@ -24,7 +24,8 @@ from app.schemas.espacio import (
     EspacioUpdate,
     EspacioResponse,
     EspacioListResponse,
-    EspacioDetalladoResponse
+    EspacioDetalladoResponse,
+    validar_coherencia_aula_piso,
 )
 
 router = APIRouter(prefix="/espacios", tags=["espacios"])
@@ -247,6 +248,11 @@ def crear_espacio(
     ```
     """
     try:
+        # 0. REGLA NEGOCIO: piso 1-7 ya validado por Pydantic; coherencia aula/piso devuelve 400
+        try:
+            validar_coherencia_aula_piso(espacio_in.nombre, espacio_in.codigo_espacio, espacio_in.piso)
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
         # 1. VALIDACIÓN DE INTEGRIDAD: Verificar que el bloque existe
         bloque = db.query(Bloque).filter(Bloque.id == espacio_in.bloque_id).first()
         if not bloque:
@@ -359,6 +365,15 @@ def actualizar_espacio(
 
     try:
         datos_update = espacio_in.model_dump(exclude_unset=True)
+        # REGLA NEGOCIO: coherencia contra valores resultantes (PUT parcial)
+        try:
+            validar_coherencia_aula_piso(
+                datos_update.get("nombre", espacio.nombre),
+                datos_update.get("codigo_espacio", espacio.codigo_espacio),
+                datos_update.get("piso", espacio.piso),
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
         if "codigo_espacio" in datos_update and datos_update["codigo_espacio"] != espacio.codigo_espacio:
             codigo_duplicado = db.query(Espacio).filter(

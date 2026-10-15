@@ -14,9 +14,32 @@ Arquitectura:
 - Documentación completa con ejemplos
 """
 
+import re
 from typing import Optional
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 from datetime import datetime
+
+
+PISO_MIN = 1
+PISO_MAX = 7
+
+
+def _primer_digito(texto: Optional[str]) -> Optional[int]:
+    if not texto:
+        return None
+    m = re.search(r"\d", texto.strip())
+    return int(m.group(0)) if m else None
+
+
+def validar_coherencia_aula_piso(nombre: Optional[str], codigo: Optional[str], piso: Optional[int]) -> None:
+    if piso is None:
+        return
+    for etiqueta in (nombre, codigo):
+        digito = _primer_digito(etiqueta)
+        if digito is not None and digito != int(piso):
+            raise ValueError(
+                f"Incoherencia aula/piso: '{etiqueta}' inicia en {digito} pero piso={piso}"
+            )
 
 
 # ============================================================================
@@ -39,10 +62,15 @@ class EspacioBase(BaseModel):
     )
     piso: Optional[int] = Field(
         None,
-        ge=0,
-        le=20,
-        description="Número de piso para visualización (0: PB, 1-20: pisos superiores)"
+        ge=PISO_MIN,
+        le=PISO_MAX,
+        description="Número de piso para visualización (1-7: pisos superiores)"
     )
+
+    @model_validator(mode="after")
+    def _coherencia_aula_piso(self):
+        validar_coherencia_aula_piso(self.nombre, self.codigo_espacio, self.piso)
+        return self
     bloque_id: int = Field(
         ...,
         gt=0,
@@ -76,20 +104,26 @@ class EspacioCreate(BaseModel):
     )
     piso: Optional[int] = Field(
         None,
-        ge=0,
-        le=20,
-        description="Número de piso para visualización (0: PB, 1-20: pisos superiores)"
+        ge=PISO_MIN,
+        le=PISO_MAX,
+        description="Número de piso para visualización (1-7: pisos superiores)"
     )
     bloque_id: int = Field(
         ...,
         gt=0,
         description="ID del bloque al que pertenece este espacio"
     )
+
     tipo_espacio_id: Optional[int] = Field(
         None,
         gt=0,
         description="ID del tipo de espacio. Opcional; si no se envía, se usa uno por defecto."
     )
+
+    @model_validator(mode="after")
+    def _coherencia_aula_piso_create(self):
+        validar_coherencia_aula_piso(self.nombre, self.codigo_espacio, self.piso)
+        return self
 
 
 class EspacioUpdate(BaseModel):
@@ -114,15 +148,20 @@ class EspacioUpdate(BaseModel):
     )
     piso: Optional[int] = Field(
         None,
-        ge=0,
-        le=20,
-        description="Actualizar número de piso"
+        ge=PISO_MIN,
+        le=PISO_MAX,
+        description="Actualizar número de piso (1-7)"
     )
     tipo_espacio_id: Optional[int] = Field(
         None,
         gt=0,
         description="Cambiar tipo de espacio"
     )
+
+    @model_validator(mode="after")
+    def _coherencia_aula_piso_update(self):
+        validar_coherencia_aula_piso(self.nombre, self.codigo_espacio, self.piso)
+        return self
 
     model_config = ConfigDict(extra="forbid")
 

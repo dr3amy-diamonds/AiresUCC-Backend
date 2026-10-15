@@ -78,7 +78,7 @@ def listar_bitacora_gestion(
     fecha_desde: Optional[date] = Query(None, description="Fecha inicial del rango"),
     fecha_hasta: Optional[date] = Query(None, description="Fecha final del rango"),
     bloque_id: Optional[int] = Query(None, gt=0, description="Filtrar por bloque"),
-    piso: Optional[int] = Query(None, ge=0, description="Filtrar por piso"),
+    piso: Optional[int] = Query(None, ge=1, le=7, description="Filtrar por piso (1-7)"),
     espacio_id: Optional[int] = Query(None, gt=0, description="Filtrar por espacio/aula"),
 ):
     """Devuelve eventos listos para renderizar en la UI con filtros combinables."""
