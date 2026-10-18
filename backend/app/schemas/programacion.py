@@ -33,7 +33,6 @@ from enum import Enum
 class EstadoProgramacionEnum(str, Enum):
     """Estados posibles de una programación de mantenimiento."""
     PENDIENTE = "Pendiente"
-    EN_PROGRESO = "En progreso"
     COMPLETADO = "Completado"
     CANCELADO = "Cancelado"
     VENCIDO = "Vencido"

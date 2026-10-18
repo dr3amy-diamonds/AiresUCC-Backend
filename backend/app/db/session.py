@@ -10,10 +10,7 @@ from dotenv import load_dotenv
 dotenv_path = os.path.join(os.path.dirname(__file__), '../../../.env')
 load_dotenv(dotenv_path)
 
-DATABASE_URL: str = os.getenv(
-    "DATABASE_URL",
-    "postgresql://aires_user:password@localhost:5432/aires_ucc"
-)
+DATABASE_URL: str = os.environ["DATABASE_URL"]
 
 # Crear engine con pool de conexiones reusables para FastAPI
 engine = create_engine(

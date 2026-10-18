@@ -253,7 +253,7 @@ def crear_mantenimiento(
     1. Validar que equipo existe
     2. Crear registro de mantenimiento (con costo_servicio)
     3. Actualizar fechas de mantenimiento del equipo (ultima_fecha y proxima_fecha)
-    4. Cambiar estado del equipo a "Operativo" (fin de reparación)
+    4. Cambiar estado del equipo a "Operativo" (fin de reparacion)
     5. Persistir cambios atómicamente
 
     Args:
@@ -300,7 +300,7 @@ def crear_mantenimiento(
         equipo.proxima_fecha = mantenimiento_in.fecha_mantenimiento + timedelta(days=90)
 
         # 4. ** SINCRONIZAR ESTADO DEL EQUIPO CON ESTADO FINAL **
-        # Catálogo único: Operativo / En reparación / Dado de baja.
+        # Catálogo único: Operativo / En reparacion / Dado de baja.
         # Si el detalle trae estado final, se respeta; si no, fallback a Operativo.
         estado_final = parse_detalle_mantenimiento(
             getattr(mantenimiento_in, "detalle_mantenimiento", None)
@@ -393,7 +393,7 @@ def cerrar_orden_atomica(
         equipo.ultima_fecha = payload.fecha_mantenimiento
         equipo.proxima_fecha = payload.fecha_mantenimiento + timedelta(days=90)
         estado_final = parse_detalle_mantenimiento(payload.detalle_mantenimiento).get("estado_final")
-        # Catálogo único: Operativo / En reparación / Dado de baja.
+        # Catálogo único: Operativo / En reparacion / Dado de baja.
         # Fallback a Operativo para no romper cierres viejos sin bloque de estado.
         equipo.estado = estado_final or "Operativo"
         equipo.updated_at = datetime.now()

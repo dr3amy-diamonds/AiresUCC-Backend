@@ -23,7 +23,7 @@ class EstadoEquiposDTO(BaseModel):
     """Bloque estado: conteo real por estado operativo."""
 
     operativos: int = Field(..., description="Equipos en estado Operativo")
-    en_reparacion: int = Field(..., description="Equipos en estado En reparación")
+    en_reparacion: int = Field(..., description="Equipos en estado En reparacion")
     inactivos: int = Field(..., description="Equipos en estado Inactivo")
     dados_baja: int = Field(..., description="Equipos en estado Dado de baja")
 

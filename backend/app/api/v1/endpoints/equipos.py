@@ -113,7 +113,7 @@ def listar_equipos_por_espacio(espacio_id: int, db: Session = Depends(get_db)):
 
 @router.get("/estado/{estado}", response_model=List[EquipoResponse])
 def listar_equipos_por_estado(estado: str, db: Session = Depends(get_db)):
-    """Filtra los equipos según su estado operativo (Operativo, En reparación, etc.)."""
+    """Filtra los equipos según su estado operativo (Operativo, En reparacion, etc.)."""
     equipos = obtener_equipos_por_estado(db, estado)
     return [EquipoResponse.model_validate(e) for e in equipos]
 

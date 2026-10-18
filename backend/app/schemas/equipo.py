@@ -50,7 +50,7 @@ class EquipoBase(BaseModel):
         fecha_instalacion (date): Fecha en que se montó el equipo en el campus.
         ultima_fecha (date): Fecha del último mantenimiento preventivo o correctivo realizado.
         proxima_fecha (date): Fecha programada para la siguiente intervención técnica.
-        estado (str): Situación operativa (Operativo, En reparación, Inactivo, Dado de baja).
+        estado (str): Situación operativa (Operativo, En reparacion, Inactivo, Dado de baja).
         marca_id (int): Identificador de la marca fabricante.
         tipo_equipo_id (int): Identificador de la categoría del equipo.
         espacio_id (int): Identificador del aula o oficina donde está ubicado.

@@ -21,9 +21,9 @@ from app.services import usuario as usuario_service
 load_dotenv()
 
 # Configuración de JWT
-SECRET_KEY: str = os.getenv("SECRET_KEY", "tu-clave-secreta-muy-segura-cambiar-en-produccion")
-ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+SECRET_KEY: str = os.environ["SECRET_KEY"]
+ALGORITHM: str = os.environ["ALGORITHM"]
+ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"])
 
 
 def hashear_contrasena(contrasena: str) -> str:

@@ -179,7 +179,7 @@ def listar_programaciones(
 
     **Filtros aplicados:**
     - `encargado_id` = usuario autenticado
-    - `estado` en Pendiente o En progreso
+    - `estado` en Pendiente
 
     **Orden:** `fecha_programada` ascendente (tareas más antiguas primero).
     """,
@@ -203,7 +203,6 @@ def obtener_mis_programaciones_asignadas(
                 Programacion.encargado_id == current_user.id,
                 Programacion.estado.in_([
                     EstadoProgramacionEnum.PENDIENTE.value,
-                    EstadoProgramacionEnum.EN_PROGRESO.value,
                 ]),
             )
             .order_by(Programacion.fecha_programada.asc())

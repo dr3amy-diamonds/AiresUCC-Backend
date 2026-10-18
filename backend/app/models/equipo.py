@@ -25,7 +25,7 @@ class Equipo(Base):
             fecha_instalacion (date): Fecha en la que el equipo fue montado en el campus.
             ultima_fecha (date): Fecha del último mantenimiento registrado satisfactoriamente.
             proxima_fecha (date): Fecha proyectada para la siguiente intervención preventiva.
-            estado (str): Estado operativo actual (Operativo, En reparación, Inactivo, Dado de baja).
+            estado (str): Estado operativo actual (Operativo, En reparacion, Inactivo, Dado de baja).
             created_at (datetime): Timestamp de creación automática del registro.
             updated_at (datetime): Timestamp de la última modificación realizada al registro.
             marca_id (int): FK a la tabla de fabricantes (marcas).

@@ -83,7 +83,7 @@ def obtener_resumen(db: Session = Depends(get_db)) -> DashboardResumenUnificadoD
         conteo_estado = {str(estado or ""): int(total or 0) for estado, total in filas_estado}
         estado_equipos = {
             "operativos": int(conteo_estado.get("Operativo", 0)),
-            "en_reparacion": int(conteo_estado.get("En reparación", 0)),
+            "en_reparacion": int(conteo_estado.get("En reparacion", 0)),
             "inactivos": int(conteo_estado.get("Inactivo", 0)),
             "dados_baja": int(conteo_estado.get("Dado de baja", 0)),
         }
