@@ -208,12 +208,12 @@ El frontend espera la API exactamente en `http://127.0.0.1:8000/api/v1` (`fronte
 ## Base de datos
 
 - **Motor:** PostgreSQL. **Esquema:** `gestion_aires_ucc` (definido en cada modelo con `__table_args__ = {"schema": "gestion_aires_ucc"}`).
-- **Tablas (14):** `auditoria`, `bloques`, `componentes_usados`, `encargados` (usuarios), `equipos`, `espacios`, `mantenimientos`, `marcas`, `programaciones`, `tipos_componentes`, `tipos_equipos`, `tipos_espacios`, `tipos_gas_refrigerante`, `tipos_mantenimiento`.
+- **Tablas (15):** `auditoria`, `bloques`, `componentes_usados`, `encargados` (usuarios), `equipos`, `espacios`, `historial_traslados`, `mantenimientos`, `marcas`, `programaciones`, `tipos_componentes`, `tipos_equipos`, `tipos_espacios`, `tipos_gas_refrigerante`, `tipos_mantenimiento`.
 - **Script canónico de creación:** `database/database.sql` (crea esquema, tablas, índices y restricciones únicas). Cárgalo con `psql -d <base> -f database/database.sql`.
 
 > Nota: `database/database.sql` no está versionado en git. Si tu copia no lo incluye, solicítalo al equipo del proyecto; sin el esquema, la app arranca pero cualquier consulta fallará con `schema "gestion_aires_ucc" does not exist`.
 
-- **Migraciones:** `backend/alembic/versions/` contiene 3 migraciones históricas de referencia (001: columnas `fecha_compra`, `voltaje`, `refrigerante` en `equipos`; 002: `tipo_evento` y `actor_nombre` en `auditoria`; 003: tabla `tipos_gas_refrigerante`). El CLI de Alembic **no está configurado para ejecutarse** (`backend/alembic.ini` está vacío y no existe `alembic/env.py`), así que no ejecutes `alembic upgrade head`: aplica estos cambios a mano solo si tu `database.sql` es anterior a ellos. Si el script base ya los incluye, no hay nada que hacer.
+- **Migraciones:** `backend/alembic/versions/` contiene 4 migraciones históricas de referencia (001: columnas `fecha_compra`, `voltaje`, `refrigerante` en `equipos`; 002: `tipo_evento` y `actor_nombre` en `auditoria`; 003: tabla `tipos_gas_refrigerante`; 004: tabla `historial_traslados`). El CLI de Alembic **no está configurado para ejecutarse** (`backend/alembic.ini` está vacío y no existe `alembic/env.py`), así que no ejecutes `alembic upgrade head`: aplica estos cambios a mano solo si tu `database.sql` es anterior a ellos. Si el script base ya los incluye, no hay nada que hacer.
 - **Conexión:** el pool usa `pool_pre_ping=True` y `pool_recycle=3600`, pensado para el timeout de PostgreSQL y recargas en desarrollo (`backend/app/db/session.py`).
 
 ## API v1
@@ -224,7 +224,7 @@ Prefijo global: `/api/v1`. Documentación interactiva en `/docs`.
 |---|---|---|
 | Autenticación | `/auth` | `POST /login/access-token` |
 | Usuarios | `/usuarios` | CRUD; gestión de roles y estado activo |
-| Equipos | `/equipos` | CRUD, cambio de estado, búsqueda por código, hoja de vida |
+| Equipos | `/equipos` | CRUD, cambio de estado, traslado con historial, búsqueda por código, hoja de vida |
 | Mantenimientos | `/mantenimientos` | CRUD, cierre de orden (dispara auto-programación) |
 | Programaciones | `/programaciones` | `/estado/pendientes`, `/estado/vencidas`, `/estado/completadas`, `/mis-asignadas`, `/orden/{orden_id}`, `/analisis/resumen`, `/analisis/agrupar-por-estado`, `/{id}/completar`, `/{id}/cancelar` |
 | Dashboard analítico | `/stats` | `/disponibilidad`, `/cumplimiento`, `/problematicos`, `/tecnicos`, `/exportar` |
@@ -257,7 +257,7 @@ Servida por FastAPI desde `frontend/` (asset estático `frontend/img/ucc.png` pa
 ## Roles y seguridad
 
 - **Autenticación:** JWT firmado (`HS256` por defecto) con claims `sub` (correo) y `rol`; expiración según `ACCESS_TOKEN_EXPIRE_MINUTES`. Hashing de contraseñas con bcrypt (12 rounds). Dependencias `require_role(*roles)` y `get_current_user` protegen los endpoints (`backend/app/core/security.py`).
-- **Roles (`TipoRol`):** `Jefe de Infraestructura` (máximos privilegios), `Auxiliar de Infraestructura` (privilegios limitados), `Tecnico` (operativo).
+- **Roles (`TipoRol`):** `Jefe de Infraestructura` (máximos privilegios), `Auxiliar de Infraestructura` (gestión de equipos e insumos), `Tecnico` (operativo; inventario y catálogo en solo lectura). Las escrituras de equipos, traslados y catálogo de insumos quedan restringidas a Jefe/Auxiliar.
 - **Middlewares:** limpieza automática de credenciales en query params (redirección transparente) y cabeceras `X-Content-Type-Options`, `X-Frame-Options`, `Cache-Control: no-store` (`backend/app/main.py`).
 - **Auditoría:** las mutaciones críticas quedan registradas con snapshot de texto (bloque/piso/espacio) para que la bitácora no dependa de joins.
 

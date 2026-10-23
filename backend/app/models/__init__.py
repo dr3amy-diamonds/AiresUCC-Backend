@@ -17,6 +17,7 @@ from app.models.mantenimiento import Mantenimiento
 from app.models.componente_usado import ComponenteUsado
 from app.models.programacion import Programacion
 from app.models.auditoria import Auditoria
+from app.models.historial_traslado import HistorialTraslado
 
 __all__ = [
     "Marca",
@@ -34,4 +35,5 @@ __all__ = [
     "ComponenteUsado",
     "Programacion",
     "Auditoria",
+    "HistorialTraslado",
 ]

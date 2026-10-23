@@ -14,7 +14,15 @@ from app.models.equipo import Equipo
 from app.models.mantenimiento import Mantenimiento
 from app.models.usuario import Usuario
 
-from app.schemas.equipo import EquipoCreate, EquipoUpdate, EquipoResponse, EquipoListResponse, ActivarEquipoRequest
+from app.schemas.equipo import (
+    EquipoCreate,
+    EquipoUpdate,
+    EquipoResponse,
+    EquipoListResponse,
+    ActivarEquipoRequest,
+    TrasladarEquipoRequest,
+    TrasladoEquipoResponse,
+)
 from app.schemas.mantenimiento import MantenimientoHistorialEquipoResponse
 from app.services.detalle_mantenimiento import parse_detalle_mantenimiento
 from app.services.equipo import (
@@ -27,8 +35,9 @@ from app.services.equipo import (
     actualizar_equipo,
     eliminar_equipo,
     cambiar_estado_equipo,
+    trasladar_equipo,
 )
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_role, ROLES_GESTION
 from app.services.audit_event_processor import registrar_evento_crud
 
 router = APIRouter(prefix="/equipos", tags=["equipos"])
@@ -117,7 +126,12 @@ def listar_equipos_por_estado(estado: str, db: Session = Depends(get_db)):
     equipos = obtener_equipos_por_estado(db, estado)
     return [EquipoResponse.model_validate(e) for e in equipos]
 
-@router.post("/", response_model=EquipoResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/",
+    response_model=EquipoResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_role(*ROLES_GESTION))],
+)
 def crear_equipo_endpoint(
     equipo_in: EquipoCreate,
     db: Session = Depends(get_db),
@@ -148,7 +162,11 @@ def crear_equipo_endpoint(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.put("/{equipo_id}", response_model=EquipoResponse)
+@router.put(
+    "/{equipo_id}",
+    response_model=EquipoResponse,
+    dependencies=[Depends(require_role(*ROLES_GESTION))],
+)
 def actualizar_equipo_endpoint(
     equipo_id: int,
     equipo_in: EquipoUpdate,
@@ -180,23 +198,110 @@ def actualizar_equipo_endpoint(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.patch("/{equipo_id}/estado/{nuevo_estado}", response_model=EquipoResponse)
+@router.post(
+    "/{equipo_id}/trasladar",
+    response_model=TrasladoEquipoResponse,
+    dependencies=[Depends(require_role(*ROLES_GESTION))],
+)
+def trasladar_equipo_endpoint(
+    equipo_id: int,
+    payload: TrasladarEquipoRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Traslada un equipo a otro espacio y registra la trazabilidad."""
+    equipo = obtener_equipo_por_id(db, equipo_id)
+    if not equipo:
+        raise HTTPException(status_code=404, detail="Equipo no encontrado")
+
+    try:
+        traslado, espacio_origen_id = trasladar_equipo(
+            db,
+            equipo,
+            payload.espacio_destino_id,
+            current_user.id,
+        )
+        registrar_evento_crud(
+            db,
+            tabla_afectada="equipos",
+            registro_id=equipo_id,
+            encargado_id=current_user.id,
+            accion="update",
+            valor_anterior=f"espacio:{espacio_origen_id}",
+            valor_nuevo=f"espacio:{payload.espacio_destino_id}",
+            equipo_id=equipo_id,
+            recurso_descripcion=equipo.codigo_activo,
+            flush=True,
+        )
+        db.commit()
+        db.refresh(equipo)
+        actualizado = obtener_equipo_por_id(db, equipo_id) or equipo
+        datos = EquipoResponse.model_validate(actualizado).model_dump()
+        return TrasladoEquipoResponse(
+            **datos,
+            traslado_id=traslado.id,
+            espacio_origen_id=espacio_origen_id,
+        )
+    except LookupError as e:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(e))
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch(
+    "/{equipo_id}/estado/{nuevo_estado}",
+    response_model=EquipoResponse,
+    dependencies=[Depends(require_role(*ROLES_GESTION))],
+)
 def cambiar_estado_endpoint(
     equipo_id: int,
     nuevo_estado: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
 ):
     """Cambia el estado de un equipo de forma rápida."""
     try:
-        equipo = cambiar_estado_equipo(db, equipo_id, nuevo_estado)
+        equipo = obtener_equipo_por_id(db, equipo_id)
         if not equipo:
             raise HTTPException(status_code=404, detail="Equipo no encontrado")
+
+        estado_anterior = equipo.estado
+        equipo = cambiar_estado_equipo(db, equipo_id, nuevo_estado)
+        if not equipo:
+            raise HTTPException(status_code=400, detail="Estado no válido")
+        registrar_evento_crud(
+            db,
+            tabla_afectada="equipos",
+            registro_id=equipo_id,
+            encargado_id=current_user.id,
+            accion="update",
+            valor_anterior=estado_anterior,
+            valor_nuevo=nuevo_estado,
+            equipo_id=equipo_id,
+            recurso_descripcion=equipo.codigo_activo,
+        )
+        db.commit()
         return EquipoResponse.model_validate(equipo)
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.delete("/{equipo_id}", status_code=status.HTTP_204_NO_CONTENT)
-@router.delete("/{equipo_id}", status_code=status.HTTP_200_OK)
+@router.delete(
+    "/{equipo_id}",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_role(*ROLES_GESTION))],
+)
 def eliminar_equipo_endpoint(
     equipo_id: int,
     db: Session = Depends(get_db),
@@ -233,25 +338,46 @@ def eliminar_equipo_endpoint(
             detail="No se puede eliminar este equipo porque tiene un historial de mantenimientos asociado en AuraData."
         )
 
-@router.post("/activar", response_model=EquipoResponse, status_code=status.HTTP_200_OK)
-def activar_equipo_endpoint(request: ActivarEquipoRequest, db: Session = Depends(get_db)):
+@router.post(
+    "/activar",
+    response_model=EquipoResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_role(*ROLES_GESTION))],
+)
+def activar_equipo_endpoint(
+    request: ActivarEquipoRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
     """Activa un equipo cambiando su estado a 'Operativo' usando su código de activo."""
     try:
         # Convertir el código a string para buscar en la BD (ya que el modelo lo define como String)
         codigo_str = str(request.codigo_activo)
         equipo = obtener_equipo_por_codigo(db, codigo_str)
-        
+
         if not equipo:
             raise HTTPException(status_code=404, detail="Equipo no encontrado con ese código de activo")
-        
-        # Actualizar el estado
+
+        estado_anterior = equipo.estado
         equipo.estado = "Operativo"
+        registrar_evento_crud(
+            db,
+            tabla_afectada="equipos",
+            registro_id=equipo.id,
+            encargado_id=current_user.id,
+            accion="update",
+            valor_anterior=estado_anterior,
+            valor_nuevo="Operativo",
+            equipo_id=equipo.id,
+            recurso_descripcion=equipo.codigo_activo,
+        )
         db.commit()
         db.refresh(equipo)
-        
+
         return EquipoResponse.model_validate(equipo)
-    
+
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
         db.rollback()

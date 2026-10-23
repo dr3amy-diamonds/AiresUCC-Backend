@@ -48,6 +48,7 @@ class EquipoBase(BaseModel):
         tonelaje (Decimal): Capacidad de refrigeración en toneladas (ej: 3.58).
         numero_serie (str): Serial único de fábrica para garantías y soporte.
         fecha_instalacion (date): Fecha en que se montó el equipo en el campus.
+        fecha_compra (date): Fecha de compra del equipo.
         ultima_fecha (date): Fecha del último mantenimiento preventivo o correctivo realizado.
         proxima_fecha (date): Fecha programada para la siguiente intervención técnica.
         estado (str): Situación operativa (Operativo, En reparacion, Inactivo, Dado de baja).
@@ -69,6 +70,7 @@ class EquipoBase(BaseModel):
     # -------------------------
 
     fecha_instalacion: Optional[date] = Field(None, description="Fecha de instalación del equipo")
+    fecha_compra: Optional[date] = Field(None, description="Fecha de compra del equipo")
     estado: str = Field(default="Operativo", description="Estado operativo actual")
     marca_id: int = Field(..., description="ID de la marca")
     tipo_equipo_id: int = Field(..., description="ID del tipo de equipo")
@@ -84,7 +86,10 @@ class EquipoUpdate(BaseModel):
     """
     Schema para la actualización parcial de un equipo.
     Permite modificar solo los campos necesarios sin afectar el resto.
+    La ubicación (espacio_id) se cambia exclusivamente mediante /trasladar.
     """
+    model_config = ConfigDict(extra="forbid")
+
     codigo_activo: Optional[str] = Field(None, min_length=1, max_length=50)
     modelo: Optional[str] = None
     capacidad_btu: Optional[int] = None
@@ -97,8 +102,8 @@ class EquipoUpdate(BaseModel):
     estado: Optional[str] = None
     marca_id: Optional[int] = Field(None, gt=0)
     tipo_equipo_id: Optional[int] = Field(None, gt=0)
-    espacio_id: Optional[int] = Field(None, gt=0)
     fecha_instalacion: Optional[date] = None
+    fecha_compra: Optional[date] = None
 
 
 class EquipoResponse(EquipoBase):
@@ -124,6 +129,17 @@ class EquipoListResponse(BaseModel):
     page: int = Field(..., description="Número de página actual")
     size: int = Field(..., description="Cantidad de items por página")
     items: list[EquipoResponse] = Field(..., description="Lista de equipos")
+
+
+class TrasladarEquipoRequest(BaseModel):
+    """Schema para trasladar un equipo a otro espacio físico."""
+    espacio_destino_id: int = Field(..., gt=0, description="ID del espacio de destino")
+
+
+class TrasladoEquipoResponse(EquipoResponse):
+    """Respuesta del traslado con trazabilidad del movimiento."""
+    traslado_id: int = Field(..., description="ID del registro en historial_traslados")
+    espacio_origen_id: Optional[int] = Field(None, description="ID del espacio de origen")
 
 
 class ActivarEquipoRequest(BaseModel):

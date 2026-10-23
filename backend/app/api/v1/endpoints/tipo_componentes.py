@@ -1,6 +1,7 @@
 """
 Endpoints para la entidad TipoComponente.
-Gestión del catálogo de repuestos e insumos (solo superusuario en escrituras).
+Gestión del catálogo de repuestos e insumos: lectura autenticada y escrituras
+restringidas a Jefe y Auxiliar de Infraestructura.
 """
 
 from typing import List
@@ -9,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, require_role, ROLES_GESTION
 from app.db.session import get_db
 from app.models.componente_usado import ComponenteUsado
 from app.models.tipo_componente import TipoComponente
@@ -23,10 +24,11 @@ from app.schemas.tipo_componente import (
 
 router = APIRouter(prefix="/tipo_componentes", tags=["tipo_componentes"])
 
-ROLES_SUPERUSUARIO = ("Jefe de Infraestructura",)
-
-
-@router.get("/", response_model=List[TipoComponenteResponse])
+@router.get(
+    "/",
+    response_model=List[TipoComponenteResponse],
+    dependencies=[Depends(get_current_user)],
+)
 def listar_tipo_componentes(
     fijos: bool = Query(False, description="Si es true, devuelve solo los 3 insumos fijos del taller"),
     skip: int = Query(0, ge=0),
@@ -50,7 +52,11 @@ def listar_tipo_componentes(
         )
 
 
-@router.get("/{tipo_id}", response_model=TipoComponenteResponse)
+@router.get(
+    "/{tipo_id}",
+    response_model=TipoComponenteResponse,
+    dependencies=[Depends(get_current_user)],
+)
 def obtener_tipo_componente(tipo_id: int, db: Session = Depends(get_db)):
     """Obtiene un tipo de componente por ID."""
     tipo = db.query(TipoComponente).filter(TipoComponente.id == tipo_id).first()
@@ -66,14 +72,14 @@ def obtener_tipo_componente(tipo_id: int, db: Session = Depends(get_db)):
     "/",
     response_model=TipoComponenteResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_role(*ROLES_SUPERUSUARIO))],
+    dependencies=[Depends(require_role(*ROLES_GESTION))],
 )
 def crear_tipo_componente(
     tipo_in: TipoComponenteCreate,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Crea un nuevo tipo de componente o insumo (solo superusuario)."""
+    """Crea un nuevo tipo de componente o insumo (Jefe/Auxiliar de Infraestructura)."""
     del current_user
     try:
         tipo_existente = (
@@ -106,7 +112,7 @@ def crear_tipo_componente(
 @router.put(
     "/{tipo_id}",
     response_model=TipoComponenteResponse,
-    dependencies=[Depends(require_role(*ROLES_SUPERUSUARIO))],
+    dependencies=[Depends(require_role(*ROLES_GESTION))],
 )
 def actualizar_tipo_componente(
     tipo_id: int,
@@ -114,7 +120,7 @@ def actualizar_tipo_componente(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Actualiza el nombre de un tipo de componente (solo superusuario)."""
+    """Actualiza el nombre de un tipo de componente (Jefe/Auxiliar de Infraestructura)."""
     del current_user
     tipo = db.query(TipoComponente).filter(TipoComponente.id == tipo_id).first()
     if not tipo:
@@ -161,14 +167,14 @@ def actualizar_tipo_componente(
 @router.delete(
     "/{tipo_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_role(*ROLES_SUPERUSUARIO))],
+    dependencies=[Depends(require_role(*ROLES_GESTION))],
 )
 def eliminar_tipo_componente(
     tipo_id: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Elimina un tipo de componente si no está en uso (solo superusuario)."""
+    """Elimina un tipo de componente si no está en uso (Jefe/Auxiliar de Infraestructura)."""
     del current_user
     tipo = db.query(TipoComponente).filter(TipoComponente.id == tipo_id).first()
     if not tipo:

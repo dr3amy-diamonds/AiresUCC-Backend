@@ -10,6 +10,7 @@ from sqlalchemy import func
 
 from app.models.equipo import Equipo
 from app.models.espacio import Espacio
+from app.models.historial_traslado import HistorialTraslado
 # IMPORTANTE: Corregido para que apunte al schema actualizado
 from app.schemas.equipo import EquipoCreate, EquipoUpdate, EquipoResponse
 
@@ -97,6 +98,39 @@ def actualizar_equipo(db: Session, db_obj: Equipo, obj_in: EquipoUpdate) -> Equi
             orig=e.orig
         ) from e
 
+def trasladar_equipo(
+    db: Session,
+    equipo: Equipo,
+    espacio_destino_id: int,
+    encargado_id: int,
+) -> tuple[HistorialTraslado, int | None]:
+    """
+    Cambia la ubicación de un equipo y registra el movimiento.
+
+    No ejecuta commit: el endpoint confirma equipo, historial y auditoría
+    dentro de una sola transacción.
+    """
+    espacio_origen_id = equipo.espacio_id
+
+    if espacio_origen_id == espacio_destino_id:
+        raise ValueError("El equipo ya se encuentra en el espacio seleccionado")
+
+    espacio_destino = db.query(Espacio).filter(Espacio.id == espacio_destino_id).first()
+    if not espacio_destino:
+        raise LookupError(f"El espacio de destino no existe (ID: {espacio_destino_id})")
+
+    equipo.espacio_id = espacio_destino.id
+    traslado = HistorialTraslado(
+        equipo_id=equipo.id,
+        espacio_origen_id=espacio_origen_id,
+        espacio_destino_id=espacio_destino.id,
+        encargado_id=encargado_id,
+    )
+    db.add(traslado)
+    db.flush()
+    return traslado, espacio_origen_id
+
+
 def eliminar_equipo(db: Session, equipo_id: int) -> bool:
     equipo = obtener_equipo_por_id(db, equipo_id)
     if equipo:
@@ -106,12 +140,19 @@ def eliminar_equipo(db: Session, equipo_id: int) -> bool:
     return False
 
 def cambiar_estado_equipo(db: Session, equipo_id: int, nuevo_estado: str) -> Optional[Equipo]:
+    """
+    Actualiza el estado de un equipo sin confirmar la transacción.
+
+    El endpoint agrega la auditoría y ejecuta el commit único.
+    """
     estados_validos = ["Operativo", "En reparacion", "Inactivo", "Dado de baja"]
-    if nuevo_estado in estados_validos:
-        equipo = obtener_equipo_por_id(db, equipo_id)
-        if equipo:
-            equipo.estado = nuevo_estado
-            db.commit()
-            db.refresh(equipo)
-        return equipo
-    return None
+    if nuevo_estado not in estados_validos:
+        return None
+
+    equipo = obtener_equipo_por_id(db, equipo_id)
+    if not equipo:
+        return None
+
+    equipo.estado = nuevo_estado
+    db.flush()
+    return equipo

@@ -25,6 +25,8 @@ SECRET_KEY: str = os.environ["SECRET_KEY"]
 ALGORITHM: str = os.environ["ALGORITHM"]
 ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"])
 
+ROLES_GESTION = ("Jefe de Infraestructura", "Auxiliar de Infraestructura")
+
 
 def hashear_contrasena(contrasena: str) -> str:
     """
