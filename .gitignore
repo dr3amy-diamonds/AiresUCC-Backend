@@ -307,7 +307,7 @@ site/
 !database/backup.sql
 !alembic/versions/
 !scripts/
-!requirements.txt
+!backend/requirements.txt
 !setup.py
 !README.md
 
